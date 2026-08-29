@@ -15,6 +15,7 @@ services:
       - ./ml:/app/ml
       - ./scenarios:/app/scenarios:ro
       - vault_creds:/vault-creds:ro
+    ports: ["9100:9100"]
 
   mcp-server:
     volumes:

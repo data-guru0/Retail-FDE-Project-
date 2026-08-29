@@ -9,12 +9,14 @@ real `agent_runs` row + streams `agent_run_events` (Redis pub/sub → dashboard 
 from __future__ import annotations
 
 import os
+import time
 import uuid
 
 import structlog
 
 from pipeline import db
 from pipeline.bus import publish_event
+from pipeline.metrics import DEAD_LETTERS, DECISION_LATENCY, PIPELINE_ERRORS, PIPELINE_RUNS
 from pipeline.observability import flush
 
 log = structlog.get_logger()
@@ -24,6 +26,7 @@ MAX_TRIES = 3
 
 async def review_return(rctx: dict, return_id: str) -> dict:
     graph_run_id = uuid.uuid4().hex
+    _t0 = time.perf_counter()
 
     context = await db.get_review_context(return_id)
     if context is None:
@@ -101,11 +104,14 @@ async def review_return(rctx: dict, return_id: str) -> dict:
             }),
         })
         flush()
+        PIPELINE_RUNS.labels(route=route).inc()
+        DECISION_LATENCY.observe(time.perf_counter() - _t0)
         log.info("review_return.done", return_id=return_id, route=route, proposed=proposed)
         return {"return_id": return_id, "route": route, "proposed": proposed}
 
     except Exception as e:  # noqa: BLE001
         err = f"{type(e).__name__}: {e}"
+        PIPELINE_ERRORS.inc()
         log.error("review_return.error", return_id=return_id, try_=job_try, error=err)
         await event("error", "system", {"try": job_try, "error": err})
         if job_try >= MAX_TRIES:
@@ -119,6 +125,7 @@ async def review_return(rctx: dict, return_id: str) -> dict:
             )
             await event("dead_letter", "system", {"attempts": job_try})
             await publish_event(return_id, {"kind": "dead_letter", "attempts": job_try})
+            DEAD_LETTERS.inc()
             log.error("review_return.dead_letter", return_id=return_id, attempts=job_try)
             return {"dead_letter": True, "return_id": return_id}
         # release the claim and re-enqueue a counted retry (5s back-off)

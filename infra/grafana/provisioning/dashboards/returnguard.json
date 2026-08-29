@@ -1,0 +1,66 @@
+{
+  "uid": "returnguard",
+  "title": "ReturnGuard",
+  "tags": ["returnguard"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries", "title": "Pipeline runs by route (rate/5m)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum by (route) (rate(rg_pipeline_runs_total[5m]))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "type": "timeseries", "title": "Errors & dead-letters (rate/5m)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "rate(rg_pipeline_errors_total[5m])", "legendFormat": "errors" },
+        { "expr": "rate(rg_dead_letters_total[5m])", "legendFormat": "dead-letters" }
+      ]
+    },
+    {
+      "type": "stat", "title": "LLM spend (USD, total)",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "targets": [{ "expr": "rg_llm_cost_usd_total" }]
+    },
+    {
+      "type": "stat", "title": "LLM spend last 24h (USD)",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+      "targets": [{ "expr": "increase(rg_llm_cost_usd_total[24h])" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [
+        { "color": "green", "value": null }, { "color": "orange", "value": 15 }, { "color": "red", "value": 20 }
+      ] } } }
+    },
+    {
+      "type": "gauge", "title": "Agent↔human agreement (30d)",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
+      "targets": [{ "expr": "rg_agent_human_agreement_ratio" }],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "red", "value": null }, { "color": "orange", "value": 0.8 }, { "color": "green", "value": 0.9 }
+      ] } } }
+    },
+    {
+      "type": "stat", "title": "Oldest undecided escalation (s)",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
+      "targets": [{ "expr": "rg_queue_oldest_seconds" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 3600 }
+      ] } } }
+    },
+    {
+      "type": "timeseries", "title": "Time-to-decision p50 / p95 (s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(rg_pipeline_seconds_bucket[10m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(rg_pipeline_seconds_bucket[10m])) by (le))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "API request rate by path",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [{ "expr": "sum by (path) (rate(rg_http_requests_total[5m]))", "legendFormat": "{{path}}" }]
+    }
+  ]
+}

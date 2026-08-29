@@ -22,6 +22,7 @@ from _rg import API, Check, db, httpx, q1, qall
 FIX = pathlib.Path(__file__).resolve().parents[1] / "scenarios" / "fixtures"
 MUG = FIX / "mug_photo.jpg"
 MISMATCH = FIX / "mismatch_photo.jpg"
+MATCHING = FIX / "matching_RG-009.jpg"   # the actual RG-009 (Terra Ceramic Mug Set) catalog photo
 
 
 # ---------------------------------------------------------------- helpers
@@ -36,9 +37,9 @@ def _user_id(email: str) -> str:
     return q1("select id from users where email=%(e)s", e=email)
 
 
-def _place_order(h: dict, product_idx: int = 0, qty: int = 1) -> dict:
+def _place_order(h: dict, product_idx: int = 0, qty: int = 1, sku: str | None = None) -> dict:
     prods = httpx.get(f"{API}/products?sort=price_asc", timeout=15).json()
-    p = prods[product_idx]
+    p = next(x for x in prods if x["sku"] == sku) if sku else prods[product_idx]
     return httpx.post(
         f"{API}/orders",
         json={"lines": [{"product_id": p["id"], "qty": qty}],
@@ -149,6 +150,39 @@ def _set_level(level: str) -> None:
 
 
 # ---------------------------------------------------------------- scenarios
+def A0(c: Check) -> None:
+    """easy legit + a genuinely matching photo, at `assist` with a low-value
+    category envelope -> the pipeline AUTO-APPROVES through the real image check
+    (CLIP match, not bypassed) and a QA sample lands."""
+    _set_level("assist")
+    h, email = _customer("a0")
+    o = _place_order(h, sku="RG-009")        # Terra Ceramic Mug Set, ~$32, well under high-value
+    _seed_history(email, orders=12, returns_=0)  # established, zero returns
+    _age_order(o["id"], 3)
+    # a plausible per-category ops envelope for a cheap, low-risk category
+    with db() as x:
+        x.execute("update feature_flags set tau_conf=0.55, tau_risk=0.55, qa_sample_pct=100 "
+                  "where scope='global'")
+    rid = _submit_return(h, o["items"][0]["id"], "damaged",
+                         "One of the four mugs arrived with a crack across the base; photo attached.",
+                         MATCHING)
+    res = _wait_final(rid)
+    img = q1("select parsed_output from agent_runs where graph_run_id=%(g)s and agent='image' "
+             "and model like 'clip%%'", g=res["graph_run_id"])
+    c.ok(img and img.get("clip_similarity", 0) >= 0.75,
+         f"A0 Image agent saw a matching photo (CLIP {img.get('clip_similarity') if img else 'n/a'})")
+    c.ok(res["status"] == "approved",
+         f"A0 auto-approved by GovernanceGate (status={res['status']})")
+    c.ok(res["refund_state"] == "pending", "A0 refund_state=pending on the auto-approval")
+    c.ok(_last_audit_action(rid) == "auto_approve",
+         f"A0 audit_log action=auto_approve ({_last_audit_action(rid)})")
+    c.ok(q1("select count(*) from agreement_samples where return_id=%(r)s and kind='qa_sample'",
+            r=rid) == 1, "A0 a QA sample landed for the auto-approval (assist, 100%)")
+    with db() as x:
+        x.execute("update feature_flags set tau_conf=0.80, tau_risk=0.30, qa_sample_pct=10 "
+                  "where scope='global'")
+
+
 def A1(c: Check) -> None:
     """easy legit, matching photo -> approve proposed; multi-agent trace."""
     _set_level("shadow")
@@ -259,8 +293,8 @@ def A10(c: Check) -> None:
     c.ok(dec is not None, "A10 a real decision agent_runs row exists (not the injected outcome)")
 
 
-SCENARIOS = {"A1": A1, "A2": A2, "A5": A5, "A6": A6, "A7": A7, "A10": A10}
-DEMO = ["A1", "A2", "A5"]
+SCENARIOS = {"A0": A0, "A1": A1, "A2": A2, "A5": A5, "A6": A6, "A7": A7, "A10": A10}
+DEMO = ["A0", "A2", "A5"]
 
 
 def main() -> None:

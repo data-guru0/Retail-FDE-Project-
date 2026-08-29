@@ -73,6 +73,12 @@ async def run_llm_agent(
         return_id=rc.return_id, graph_run_id=rc.graph_run_id,
         tokens_in=result.tokens_in, tokens_out=result.tokens_out, cost=result.cost_usd,
     )
+    try:
+        from pipeline.metrics import LLM_COST
+
+        LLM_COST.inc(float(result.cost_usd))
+    except Exception:  # noqa: BLE001
+        pass
     conf = parsed.get("confidence")
     run_id = await db.insert_agent_run(
         return_id=rc.return_id, graph_run_id=rc.graph_run_id, agent=agent,

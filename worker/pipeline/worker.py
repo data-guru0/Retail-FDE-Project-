@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from arq import cron
 
-from pipeline import db
+from pipeline import db, metrics
 from pipeline.jobs import dispatch_outbox, reembed_policy, review_return
 from pipeline.settings import redis_settings
 
@@ -13,7 +13,16 @@ log = structlog.get_logger()
 
 async def startup(ctx: dict) -> None:
     await db.start()
+    try:
+        metrics.serve(9100)
+    except OSError:
+        pass  # already bound (reload)
     log.info("worker.startup")
+
+
+async def refresh_metrics(ctx: dict) -> str:
+    await metrics.refresh_gauges(db)
+    return "ok"
 
 
 async def shutdown(ctx: dict) -> None:
@@ -29,7 +38,7 @@ async def heartbeat(ctx: dict) -> str:
 
 
 class WorkerSettings:
-    functions = [review_return, dispatch_outbox, reembed_policy, heartbeat]
+    functions = [review_return, dispatch_outbox, reembed_policy, refresh_metrics, heartbeat]
     redis_settings = redis_settings()
     on_startup = startup
     on_shutdown = shutdown
@@ -39,4 +48,5 @@ class WorkerSettings:
     cron_jobs = [
         cron(heartbeat, minute=set(range(60)), run_at_startup=True),
         cron(dispatch_outbox, second={0, 10, 20, 30, 40, 50}, run_at_startup=True),
+        cron(refresh_metrics, second={5, 20, 35, 50}, run_at_startup=True),
     ]
