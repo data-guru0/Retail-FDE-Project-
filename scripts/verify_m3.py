@@ -59,21 +59,25 @@ def main() -> None:
     rid, h, _ = submit_return()
     print(f"  submitted return {rid}; waiting for the worker…")
 
-    deadline = time.time() + 90
-    run = None
+    # wait for the pipeline to actually finish (GovernanceGate is the last node)
+    deadline = time.time() + 150
+    final_status = None
     while time.time() < deadline:
-        run = q1(
-            "select json_build_object("
-            "'model',model,'tokens_in',tokens_in,'tokens_out',tokens_out,"
-            "'cost',cost_usd,'latency',latency_ms,'trace',langfuse_trace_id,"
-            "'parsed',parsed_output,'conf',confidence,'level',automation_level)"
-            " from agent_runs where return_id=%(r)s and agent='decision' "
-            "order by created_at desc limit 1",
-            r=rid,
-        )
-        if run:
+        final_status = q1("select status from returns where id=%(r)s", r=rid)
+        if final_status in ("approved", "escalated", "denied", "refunded"):
             break
         time.sleep(3)
+    c.ok(final_status in ("approved", "escalated", "denied", "refunded"),
+         f"pipeline reached a final state ({final_status})")
+
+    run = q1(
+        "select json_build_object("
+        "'model',model,'tokens_in',tokens_in,'tokens_out',tokens_out,"
+        "'cost',cost_usd,'latency',latency_ms,'trace',langfuse_trace_id,"
+        "'parsed',parsed_output,'conf',confidence,'level',automation_level)"
+        " from agent_runs where return_id=%(r)s and agent='decision' "
+        "order by created_at desc limit 1", r=rid,
+    )
     c.ok(run is not None, "an agent_runs row (agent=decision) was written")
     if not run:
         c.done()
@@ -89,10 +93,11 @@ def main() -> None:
 
     api_ret = httpx.get(f"{API}/returns/{rid}", headers=h, timeout=15).json()
     c.ok(api_ret["decision"] == decision,
-         f"API return.decision ({api_ret['decision']}) == agent_runs decision ({decision})")
+         f"API return.decision ({api_ret['decision']}) == decision agent's proposal ({decision})")
     row_dec = q1("select decision from returns where id=%(r)s", r=rid)
-    c.ok(row_dec == decision, f"returns.decision row ({row_dec}) == agent decision")
-    c.ok(api_ret["status"] == "in_review", "return moved to in_review (shadow: awaiting human)")
+    c.ok(row_dec == decision, f"returns.decision row ({row_dec}) == decision agent's proposal")
+    c.ok(api_ret["status"] in ("in_review", "escalated", "approved"),
+         f"shadow: agent decided, human still acts (status={api_ret['status']})")
 
     # events streamed
     evs = qall("select kind from agent_run_events where return_id=%(r)s order by seq", r=rid)

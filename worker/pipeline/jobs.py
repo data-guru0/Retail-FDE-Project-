@@ -89,6 +89,7 @@ async def review_return(rctx: dict, return_id: str) -> dict:
         dec = final_state.get("decision", {})
         proposed = final.get("proposed") or dec.get("decision", "escalate")
         route = final.get("route", "escalate")
+        seq = final_state.get("seq", seq)  # continue the event sequence past the graph's
 
         await event("pipeline_end", "system", {
             "route": route, "proposed": proposed, "automation_level": level,
