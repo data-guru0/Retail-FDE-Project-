@@ -4,7 +4,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl \
   && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN pip install --upgrade pip && pip install -e .
-# ML extras (torch/open-clip/sklearn/transformers) are installed at M4:
-#   pip install ".[ml]"
+# CPU-only torch from the pytorch CPU index keeps the image small and the resolve fast.
+RUN pip install --upgrade pip \
+ && pip install --index-url https://download.pytorch.org/whl/cpu torch==2.13.0 \
+ && pip install -e ".[ml]"
 CMD ["arq", "pipeline.worker.WorkerSettings"]

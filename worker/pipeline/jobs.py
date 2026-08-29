@@ -1,18 +1,13 @@
-"""M3 single-agent return review.
+"""Return review job.
 
-One real Groq call (via Bifrost, with the OpenAI fallback chain active) reads a
-return and produces a structured, guardrail-validated decision. The decision is
-written to `returns` + a real `agent_runs` row; every step streams an
-`agent_run_events` row (and a Redis pub/sub event for the live dashboard trace);
-a real Langfuse generation is recorded. `automation_level` defaults to `shadow`:
-the agent decides, a human still acts.
-
-M4 replaces this single node with the full LangGraph pipeline.
+`review_return` claims a pending return, runs the full LangGraph pipeline
+(pipeline/graph.py), and lets GovernanceGate finalize it. Every step writes a
+real `agent_runs` row + streams `agent_run_events` (Redis pub/sub → dashboard WS)
++ records a Langfuse generation. Retry is counted on `returns.review_attempts`;
+3 crashes → `dead_letter` + auto-escalate. Never an infinite retry.
 """
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import uuid
 
@@ -20,49 +15,11 @@ import structlog
 
 from pipeline import db
 from pipeline.bus import publish_event
-from pipeline.guardrails import parse_validated
-from pipeline.llm import chat
-from pipeline.observability import flush, record_generation
-from pipeline.prompts.registry import load, prompt_version
+from pipeline.observability import flush
 
 log = structlog.get_logger()
 
-DECISION_SCHEMA = {
-    "type": "object",
-    "required": ["decision", "confidence", "risk", "reason"],
-    "additionalProperties": True,
-    "properties": {
-        "decision": {"enum": ["approve", "deny", "escalate"]},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "risk": {"type": "number", "minimum": 0, "maximum": 1},
-        "reason": {"type": "string", "minLength": 3},
-        "signals": {"type": "array", "items": {"type": "string"}},
-    },
-}
-
 MAX_TRIES = 3
-
-
-def _facts(ctx: dict) -> str:
-    age_days = None
-    if ctx.get("age_since_order") is not None:
-        age_days = round(ctx["age_since_order"].total_seconds() / 86400, 1)
-    return json.dumps(
-        {
-            "item_name": ctx["item_name"],
-            "category": ctx["category"],
-            "product_description": (ctx.get("product_description") or "")[:400],
-            "reason_code": ctx["reason_code"],
-            "customer_reason_text": ctx["reason_text"],
-            "refund_amount_usd": float(ctx["amount"]),
-            "order_total_usd": float(ctx["order_total"]),
-            "days_since_order": age_days,
-            "photo_provided": ctx["photo_count"] > 0,
-            "customer_lifetime_orders": ctx["user_order_count"],
-            "customer_lifetime_returns": ctx["user_return_count"],
-        },
-        indent=2,
-    )
 
 
 async def review_return(rctx: dict, return_id: str) -> dict:
@@ -115,53 +72,36 @@ async def review_return(rctx: dict, return_id: str) -> dict:
         if os.getenv("RG_PIPELINE_FORCE_ERROR"):
             raise RuntimeError("forced pipeline error (RG_PIPELINE_FORCE_ERROR)")
 
-        system, version, _ = load("decision")
-        facts = _facts(context)
-        input_hash = hashlib.sha256(facts.encode()).hexdigest()
+        from pipeline.graph import run_pipeline
 
-        await event("node_start", "decision", {"model_role": "reason"})
-        result = chat("reason", system, facts, max_tokens=900)
-        parsed, result = parse_validated(
-            result, DECISION_SCHEMA, role="reason", system=system, user=facts
-        )
+        initial = {
+            "return_id": return_id,
+            "graph_run_id": graph_run_id,
+            "automation_level": level,
+            "kill_switch": kill,
+            "category": context["category"],
+            "context": context,
+            "seq": seq,
+            "errors": [],
+        }
+        final_state = await run_pipeline(initial)
+        final = final_state.get("final", {})
+        dec = final_state.get("decision", {})
+        proposed = final.get("proposed") or dec.get("decision", "escalate")
+        route = final.get("route", "escalate")
 
-        trace_id = record_generation(
-            agent="decision", model=result.model, prompt=facts, output=result.text,
-            return_id=return_id, graph_run_id=graph_run_id,
-            tokens_in=result.tokens_in, tokens_out=result.tokens_out, cost=result.cost_usd,
-        )
-
-        run_id = await db.insert_agent_run(
-            return_id=return_id, graph_run_id=graph_run_id, agent="decision",
-            sa_subject=None, model=result.model, prompt_version=prompt_version("decision"),
-            policy_version=None, automation_level=level, input_hash=input_hash,
-            raw_response=result.text, parsed_output=parsed,
-            confidence=round(float(parsed["confidence"]), 3),
-            tokens_in=result.tokens_in, tokens_out=result.tokens_out,
-            cost_usd=result.cost_usd, latency_ms=result.latency_ms,
-            langfuse_trace_id=trace_id, error=None,
-        )
-        await event("node_end", "decision", {
-            "agent_run_id": run_id, "decision": parsed["decision"],
-            "confidence": parsed["confidence"], "risk": parsed["risk"],
-            "reason": parsed["reason"], "signals": parsed.get("signals", []),
-            "model": result.model, "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out, "cost_usd": result.cost_usd,
-            "latency_ms": result.latency_ms,
+        await event("pipeline_end", "system", {
+            "route": route, "proposed": proposed, "automation_level": level,
+            "auto": final.get("auto", False),
+            "agents_fired": sorted({
+                r["agent"] for r in await db.fetchall(
+                    "SELECT DISTINCT agent FROM agent_runs WHERE graph_run_id=%(g)s",
+                    {"g": graph_run_id})
+            }),
         })
-
-        # shadow: record the agent's proposal on the return; a human still acts.
-        await db.execute(
-            "UPDATE returns SET decision=%(d)s, decision_reason=%(r)s, status='in_review' "
-            "WHERE id=%(id)s",
-            {"d": parsed["decision"], "r": parsed["reason"], "id": return_id},
-        )
-        await event("pipeline_end", "system",
-                    {"proposed_decision": parsed["decision"], "automation_level": level})
         flush()
-        log.info("review_return.done", return_id=return_id, decision=parsed["decision"],
-                 model=result.model, cost=result.cost_usd)
-        return {"return_id": return_id, "decision": parsed["decision"], "agent_run_id": run_id}
+        log.info("review_return.done", return_id=return_id, route=route, proposed=proposed)
+        return {"return_id": return_id, "route": route, "proposed": proposed}
 
     except Exception as e:  # noqa: BLE001
         err = f"{type(e).__name__}: {e}"
@@ -187,6 +127,15 @@ async def review_return(rctx: dict, return_id: str) -> dict:
         )
         await rctx["redis"].enqueue_job("review_return", return_id, _defer_by=5)
         return {"retry_scheduled": True, "attempt": job_try, "error": err}
+
+
+async def reembed_policy(rctx: dict) -> dict:
+    """Re-embed the active policy docs into Qdrant (triggered by the admin Policy editor)."""
+    from pipeline.policy_index import reembed
+
+    out = await reembed()
+    log.info("reembed_policy.done", **out)
+    return out
 
 
 async def dispatch_outbox(rctx: dict) -> int:

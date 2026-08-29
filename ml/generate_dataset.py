@@ -97,22 +97,26 @@ def build() -> pd.DataFrame:
                        "not_as_described", "wrong_item") else 0.15))
             night = int(rng.random() < 0.18)
 
-            # --- fraud generative process --------------------------------
-            p_fraud = 0.02
+            # --- fraud generative process (learnable from OBSERVABLE features) ---
+            p_fraud = 0.015
             if high:
-                p_fraud += 0.12
+                p_fraud += 0.10 + 0.35 * base_return_rate      # churny + high return rate
             if ring >= 0:
-                p_fraud = 0.75
-                refund_amount = float(np.round(rng.uniform(120, 600), 2))
+                p_fraud = 0.82
+                refund_amount = float(np.round(rng.uniform(150, 600), 2))
                 order_total = float(np.round(max(order_total, refund_amount + rng.uniform(0, 40)), 2))
-                days_since_order = int(rng.integers(20, 74))
+                days_since_order = int(rng.integers(25, 74))
+            p_fraud += 0.20 * min(shared_addr, 5) / 5          # shared-fingerprint accounts
+            p_fraud += 0.06 * min(prior_denied, 5)             # history of denials
             if reason in ("damaged", "defective") and photo == 0:
-                p_fraud += 0.06
+                p_fraud += 0.10
             if days_since_order > 45:
-                p_fraud += 0.05
+                p_fraud += 0.10
             if refund_amount > 300:
-                p_fraud += 0.04
-            p_fraud = min(p_fraud, 0.97)
+                p_fraud += 0.08
+            if night:
+                p_fraud += 0.03
+            p_fraud = float(np.clip(p_fraud, 0.005, 0.97))
             is_fraud = int(rng.random() < p_fraud)
 
             # denied returns accumulate for fraudulent-ish customers

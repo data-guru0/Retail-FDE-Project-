@@ -1,0 +1,29 @@
+{
+  "results": {
+    "Organika/sdxl-detector": {
+      "n_ai": 6,
+      "n_real": 6,
+      "mean_ai_score": 0.999,
+      "mean_real_score": 0.512,
+      "accuracy@0.5": 0.75,
+      "separation": 0.487
+    },
+    "umm-maybe/AI-image-detector": {
+      "n_ai": 6,
+      "n_real": 6,
+      "mean_ai_score": 0.145,
+      "mean_real_score": 0.084,
+      "accuracy@0.5": 0.5,
+      "separation": 0.061
+    },
+    "haywoodsloan/ai-image-detector-deploy": {
+      "n_ai": 6,
+      "n_real": 6,
+      "mean_ai_score": 0.991,
+      "mean_real_score": 0.173,
+      "accuracy@0.5": 0.917,
+      "separation": 0.818
+    }
+  },
+  "chosen": "haywoodsloan/ai-image-detector-deploy"
+}

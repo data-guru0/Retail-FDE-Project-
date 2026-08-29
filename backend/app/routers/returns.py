@@ -130,3 +130,44 @@ async def get_return(
     if r is None or str(r.user_id) != p.user_id:
         raise HTTPException(404, "return not found")
     return _out(r, await _photo_urls(session, r.id))
+
+
+@router.get("/{return_id}/info-request")
+async def open_info_request(
+    return_id: str,
+    p: Principal = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from sqlalchemy import text
+
+    row = (await session.execute(text(
+        "SELECT i.id::text, i.question FROM info_requests i JOIN returns r ON r.id=i.return_id "
+        "WHERE i.return_id=:r AND i.answered_at IS NULL AND r.user_id=:u "
+        "ORDER BY i.created_at DESC LIMIT 1"),
+        {"r": return_id, "u": p.user_id})).mappings().one_or_none()
+    return dict(row) if row else {}
+
+
+@router.post("/{return_id}/info-request")
+async def answer_info_request(
+    return_id: str,
+    answer: str = Form(...),
+    p: Principal = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    from sqlalchemy import text
+
+    from app.services.queue import enqueue_review
+
+    upd = (await session.execute(text(
+        "UPDATE info_requests SET answer=:a, answered_at=now() "
+        "WHERE return_id=:r AND answered_at IS NULL "
+        "AND return_id IN (SELECT id FROM returns WHERE user_id=:u) RETURNING id"),
+        {"a": answer[:2000], "r": return_id, "u": p.user_id})).first()
+    if not upd:
+        raise HTTPException(404, "no open info request")
+    await session.execute(text(
+        "UPDATE returns SET status='pending', review_attempts=0 WHERE id=:r"), {"r": return_id})
+    await session.commit()
+    await enqueue_review(return_id)
+    return {"answered": True, "status": "re-queued"}

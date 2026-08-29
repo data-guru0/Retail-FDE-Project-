@@ -33,3 +33,5 @@ next-env.d.ts
 docker-compose.dlqtest.yml
 scripts/_dlq_worker.log
 ml/data/
+ml/detector_bakeoff/sample/
+scenarios/mcp_setup.json

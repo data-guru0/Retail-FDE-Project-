@@ -52,6 +52,16 @@ dataset: ## generate the synthetic ML dataset
 train: ## train + register the behavior risk model
 	$(COMPOSE) run --rm worker python -m ml.train
 
+reembed-policy: ## embed the active policy docs into Qdrant
+	$(COMPOSE) run --rm worker python -m pipeline.policy_index
+
+mcp-setup: ## configure ContextForge: gateway + per-agent virtual servers
+	$(COMPOSE) run --rm -e ADMIN_PASS=$$KEYCLOAK_ADMIN_PASSWORD \
+	  -v $(PWD)/scenarios:/out mcp-server python /app/../infra/mcp-gateway/setup.py || true
+
+m4-setup: dataset train reembed-policy ## everything the M4 pipeline needs before it can run
+	@echo "M4 setup complete (dataset + model + policy index)"
+
 loadtest: ## ~20x return volume
 	python scripts/loadtest.py
 
@@ -61,4 +71,4 @@ backup: ## pg_dump + qdrant snapshot + minio mirror
 restore: ## restore from backups/
 	@bash scripts/restore.sh
 
-.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init smoke scenarios demo dataset train loadtest backup restore
+.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init smoke scenarios demo dataset train loadtest backup restore reembed-policy mcp-setup m4-setup

@@ -76,6 +76,30 @@ def chat(
     )
 
 
+def chat_vision(*, role: str, system: str, text: str, image_bytes: bytes,
+                virtual_key: str | None = None, max_tokens: int = 300) -> str:
+    """Vision call via Bifrost. Image is inlined as a base64 data URL (OpenAI's
+    servers can't reach our local MinIO)."""
+    import base64
+
+    b64 = base64.b64encode(image_bytes).decode()
+    resp = _client(virtual_key).chat.completions.create(
+        model=model(role),
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            ]},
+        ],
+        max_tokens=max_tokens,
+        temperature=0,
+        extra_body={"fallbacks": fallbacks(role)} if fallbacks(role) else {},
+    )
+    m = resp.model_dump()["choices"][0]["message"]
+    return (m.get("content") or m.get("reasoning_content") or "").strip()
+
+
 # rough public prices (USD per 1M tokens) — good enough for the unit-economics view;
 # Langfuse holds the authoritative figure per span.
 _PRICES = {

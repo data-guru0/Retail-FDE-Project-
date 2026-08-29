@@ -11,6 +11,8 @@ services:
   worker:
     volumes:
       - ./worker:/app
+      - ./ml:/app/ml
+      - ./scenarios:/app/scenarios:ro
       - vault_creds:/vault-creds:ro
 
   mcp-server:

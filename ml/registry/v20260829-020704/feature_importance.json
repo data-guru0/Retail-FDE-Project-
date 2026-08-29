@@ -1,0 +1,62 @@
+[
+  {
+    "feature": "customer_return_rate",
+    "importance": 0.1001
+  },
+  {
+    "feature": "days_since_order",
+    "importance": 0.0351
+  },
+  {
+    "feature": "refund_amount",
+    "importance": 0.0157
+  },
+  {
+    "feature": "shared_address_accounts",
+    "importance": 0.0061
+  },
+  {
+    "feature": "seasonal",
+    "importance": 0.0037
+  },
+  {
+    "feature": "night_submission",
+    "importance": 0.0024
+  },
+  {
+    "feature": "photo_provided",
+    "importance": 0.0016
+  },
+  {
+    "feature": "reason_code_arrived_late",
+    "importance": 0.0016
+  },
+  {
+    "feature": "reason_code_quality",
+    "importance": 0.0015
+  },
+  {
+    "feature": "reason_code_wrong_item",
+    "importance": 0.0009
+  },
+  {
+    "feature": "account_age_days",
+    "importance": 0.0008
+  },
+  {
+    "feature": "reason_code_no_longer_needed",
+    "importance": 0.0005
+  },
+  {
+    "feature": "category_Apparel",
+    "importance": 0.0004
+  },
+  {
+    "feature": "category_Sports & Outdoors",
+    "importance": -0.0002
+  },
+  {
+    "feature": "reason_code_damaged",
+    "importance": -0.0002
+  }
+]

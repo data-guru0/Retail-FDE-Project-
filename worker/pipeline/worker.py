@@ -5,7 +5,7 @@ import structlog
 from arq import cron
 
 from pipeline import db
-from pipeline.jobs import dispatch_outbox, review_return
+from pipeline.jobs import dispatch_outbox, reembed_policy, review_return
 from pipeline.settings import redis_settings
 
 log = structlog.get_logger()
@@ -29,7 +29,7 @@ async def heartbeat(ctx: dict) -> str:
 
 
 class WorkerSettings:
-    functions = [review_return, dispatch_outbox, heartbeat]
+    functions = [review_return, dispatch_outbox, reembed_policy, heartbeat]
     redis_settings = redis_settings()
     on_startup = startup
     on_shutdown = shutdown
