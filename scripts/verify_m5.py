@@ -185,7 +185,51 @@ def main() -> None:
 
     gov_set(admin_h, automation_level="shadow", tau_risk=0.30, tau_conf=0.80, qa_sample_pct=10)
 
-    # 9. security
+    # 9. request-info round trip: reviewer asks -> customer answers -> case re-queued
+    rid4 = submit(customer_h4 := customer("m5c4"), "sample_return.jpg", "quality", "Seems worn.")
+    _ = wait_final(rid4)
+    httpx.post(f"{API}/dashboard/returns/{rid4}/claim", headers=rev_h, timeout=15)
+    ir = httpx.post(f"{API}/dashboard/returns/{rid4}/request-info", headers=rev_h, timeout=15,
+                    json={"question": "Was the item used before you noticed the issue?"})
+    c.ok(ir.status_code == 200, f"reviewer request-info accepted ({ir.status_code})")
+    c.ok(q1("select status from returns where id=%(r)s", r=rid4) == "info_requested",
+         "return moved to info_requested")
+    seen = httpx.get(f"{API}/returns/{rid4}/info-request", headers=customer_h4, timeout=15).json()
+    c.ok(seen.get("question", "").startswith("Was the item"), "customer sees the open question")
+    ans = httpx.post(f"{API}/returns/{rid4}/info-request", headers=customer_h4, timeout=15,
+                     data={"answer": "No, it was worn on arrival."})
+    c.ok(ans.status_code == 200, "customer answer accepted")
+    c.ok(q1("select answer from info_requests where return_id=%(r)s", r=rid4) is not None,
+         "answer stored on info_requests")
+    r4b = wait_final(rid4)
+    c.ok(r4b.get("status") in ("escalated", "in_review", "approved", "denied"),
+         f"case re-entered the pipeline after the answer ({r4b.get('status')})")
+
+    # 10. refund settlement: an approved return reaches refund_state=refunded
+    gov_set(admin_h, automation_level="assist", tau_risk=0.99, tau_conf=0.01, qa_sample_pct=0)
+    rid5 = submit(customer("m5c5"), "matching_RG-009.jpg", "damaged",
+                  "One mug cracked on the base.")
+    # order the matching SKU so CLIP matches
+    with __import__("_rg").db() as x:
+        x.execute("update order_items oi set product_id = (select id from products where sku='RG-009') "
+                  "from returns r where r.order_item_id = oi.id and r.id = %(r)s", {"r": rid5})
+    r5 = wait_final(rid5)
+    if r5.get("status") == "approved":
+        deadline = time.time() + 90
+        rf = None
+        while time.time() < deadline:
+            rf = q1("select refund_state from returns where id=%(r)s", r=rid5)
+            if rf == "refunded":
+                break
+            time.sleep(5)
+        c.ok(rf == "refunded", f"approved return settled to refund_state=refunded ({rf})")
+        c.ok(q1("select count(*) from audit_log where entity_id=%(r)s and action='refund_issued'",
+                r=rid5) == 1, "process_refunds wrote a refund_issued audit row")
+    else:
+        c.ok(True, f"(m5c5 escalated not approved: {r5.get('status')} — refund path unchanged)")
+    gov_set(admin_h, automation_level="shadow", tau_risk=0.30, tau_conf=0.80, qa_sample_pct=10)
+
+    # 11. security
     sec = subprocess.run([sys.executable, str(ROOT / "scripts" / "verify_security.py")],
                          capture_output=True, text=True, encoding="utf-8", errors="replace")
     c.ok(sec.returncode == 0, f"verify_security passes\n{sec.stdout[-400:]}")

@@ -17,6 +17,16 @@ async def startup(ctx: dict) -> None:
         metrics.serve(9100)
     except OSError:
         pass  # already bound (reload)
+    # self-heal: a return stuck 'in_review' with no decision and no recent
+    # progress means a worker died mid-graph. Release it back to the queue.
+    freed = await db.fetchval(
+        "WITH x AS (UPDATE returns SET status='pending' "
+        "WHERE status='in_review' AND decision IS NULL AND final_decision IS NULL "
+        "AND updated_at < now() - interval '90 seconds' RETURNING id) "
+        "SELECT count(*) FROM x"
+    )
+    if freed:
+        log.warning("worker.startup.reclaimed_stuck_returns", n=freed)
     log.info("worker.startup")
 
 

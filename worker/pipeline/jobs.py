@@ -195,15 +195,25 @@ async def process_refunds(rctx: dict) -> int:
 
 
 async def dispatch_outbox(rctx: dict) -> int:
-    """Durability backstop: enqueue any return.submitted outbox row the backend's
-    best-effort enqueue missed (older than 8s and still undispatched)."""
-    ids = await db.fetchall(
-        "SELECT payload->>'return_id' AS rid FROM outbox "
-        "WHERE topic='return.submitted' AND dispatched_at IS NULL "
-        "AND created_at < now() - interval '8 seconds'"
+    """Durability backstop. Enqueue:
+      1. `return.submitted` outbox rows the backend's best-effort enqueue missed
+         (older than 8s, still undispatched), and
+      2. any return sitting in `pending`/`info_requested` that isn't being worked
+         (self-heal after a worker was killed mid-graph and startup released the
+         claim — the outbox row was already marked dispatched at claim time)."""
+    rows = await db.fetchall(
+        """
+        SELECT payload->>'return_id' AS rid FROM outbox
+          WHERE topic='return.submitted' AND dispatched_at IS NULL
+            AND created_at < now() - interval '8 seconds'
+        UNION
+        SELECT id::text AS rid FROM returns
+          WHERE status IN ('pending','info_requested')
+            AND updated_at < now() - interval '15 seconds'
+        """
     )
     n = 0
-    for row in ids:
+    for row in rows:
         await rctx["redis"].enqueue_job("review_return", row["rid"])
         n += 1
     if n:

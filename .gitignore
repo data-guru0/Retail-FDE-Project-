@@ -35,3 +35,6 @@ scripts/_dlq_worker.log
 ml/data/
 ml/detector_bakeoff/sample/
 scenarios/mcp_setup.json
+frontend/AGENTS.md
+framework/CLAUDE.md
+frontend/CLAUDE.md
