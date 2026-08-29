@@ -140,6 +140,7 @@ class Return(Base, TS):
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("reviewers.id"), nullable=True)
     decided_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     graph_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_attempts: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     __table_args__ = (
         CheckConstraint(f"status in {RETURN_STATUS}", name="ck_return_status"),
         CheckConstraint(f"refund_state in {REFUND_STATE}", name="ck_return_refund_state"),

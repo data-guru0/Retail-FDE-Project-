@@ -14,6 +14,7 @@ from app.schemas import ReturnCreateOut, ReturnOut
 from app.security import Principal, current_user
 from app.services import mail, storage
 from app.services.images import clean_image
+from app.services.queue import enqueue_review
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
@@ -99,6 +100,7 @@ async def submit_return(
     )
     await session.commit()  # returns + photo + outbox in one transaction
 
+    await enqueue_review(str(return_id))  # best-effort; outbox + cron is the backstop
     mail.send(
         p.email, "We received your return request",
         f"Return {return_id} for order {item.order_id} is under review.",

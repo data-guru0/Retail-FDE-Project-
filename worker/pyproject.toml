@@ -25,14 +25,14 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-  "scikit-learn",
-  "numpy",
-  "pandas",
-  "joblib",
-  "open-clip-torch",
-  "torch",
-  "Pillow",
-  "transformers",
+  "scikit-learn==1.9.0",
+  "numpy==2.5.2",
+  "pandas==3.0.5",
+  "joblib==1.5.3",
+  "open-clip-torch==3.3.0",
+  "torch==2.13.0",
+  "Pillow==12.3.0",
+  "transformers==5.16.1",
 ]
 
 [build-system]

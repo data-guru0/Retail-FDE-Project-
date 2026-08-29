@@ -151,9 +151,8 @@ services:
     <<: *env
     environment:
       APP_PORT: "8080"
-      BIFROST_CONFIG_PATH: /app/config/config.json
     volumes:
-      - ./infra/bifrost:/app/config
+      - ./infra/bifrost/config.json:/app/data/config.json:ro
     ports: ["8090:8080"]
     networks: [rg]
 

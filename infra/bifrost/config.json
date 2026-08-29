@@ -1,7 +1,6 @@
 {
   "client": {
-    "drop_excess_requests": false,
-    "prometheus_labels": ["model", "provider"]
+    "drop_excess_requests": false
   },
   "providers": {
     "openai": {
@@ -17,17 +16,10 @@
       "keys": [
         {
           "value": "env.GROQ_API_KEY",
-          "models": [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "openai/gpt-oss-120b"
-          ],
+          "models": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"],
           "weight": 1.0
         }
-      ],
-      "network_config": {
-        "base_url": "https://api.groq.com/openai/v1"
-      }
+      ]
     }
   }
 }

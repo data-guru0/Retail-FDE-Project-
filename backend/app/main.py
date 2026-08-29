@@ -49,11 +49,9 @@ def metrics():
 
 
 # Routers added in later milestones (shop, orders, returns, dashboard, ...).
-try:
-    from app.routers import orders, returns, shop  # noqa: F401
+from app.routers import orders, returns, shop, ws
 
-    app.include_router(shop.router)
-    app.include_router(orders.router)
-    app.include_router(returns.router)
-except ImportError:
-    log.info("backend.routers.partial", note="shop/orders/returns not yet present")
+app.include_router(shop.router)
+app.include_router(orders.router)
+app.include_router(returns.router)
+app.include_router(ws.router)

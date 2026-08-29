@@ -30,3 +30,6 @@ Thumbs.db
 node_modules/
 .next/
 next-env.d.ts
+docker-compose.dlqtest.yml
+scripts/_dlq_worker.log
+ml/data/
