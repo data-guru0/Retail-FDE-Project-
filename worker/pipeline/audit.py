@@ -28,8 +28,12 @@ async def append(*, actor_type: str, actor_id: str, action: str,
                  entity_type: str, entity_id: str, data: dict) -> str:
     async with db.pool.connection() as conn:
         async with conn.transaction():
+            # serialize ALL audit appends (backend + worker) on one xact-scoped
+            # advisory lock — "lock the last row FOR UPDATE" forks under concurrency
+            # because a blocked SELECT ... LIMIT 1 does not re-scan for the new tip.
+            await conn.execute("SELECT pg_advisory_xact_lock(742042)")
             cur = await conn.execute(
-                "SELECT row_hash FROM audit_log ORDER BY id DESC LIMIT 1 FOR UPDATE"
+                "SELECT row_hash FROM audit_log ORDER BY id DESC LIMIT 1"
             )
             last = await cur.fetchone()
             prev = last[0] if last else GENESIS

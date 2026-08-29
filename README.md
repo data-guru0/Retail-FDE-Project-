@@ -20,7 +20,7 @@ The only things that cost money are the Groq and OpenAI API calls.
 
 ---
 
-## The problem, in plain words
+## The problem this solves, in plain words
 
 A retailer gets a stream of return requests: "it arrived broken", "wrong item",
 "changed my mind". Each one needs someone to check the order, check the return

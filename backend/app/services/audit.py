@@ -26,10 +26,13 @@ async def append(
     entity_type: str, entity_id: str, data: dict,
 ) -> str:
     """Append one row within the caller's transaction (so the mutation + its audit
-    row commit together). Takes FOR UPDATE on the chain tip to serialise appends."""
+    row commit together). A single xact-scoped advisory lock serialises ALL audit
+    appends across the backend and the worker — "SELECT the tip FOR UPDATE" forks
+    under concurrency (a blocked LIMIT 1 does not re-scan for the new tip)."""
+    await session.execute(text("SELECT pg_advisory_xact_lock(742042)"))
     last = (
         await session.execute(
-            text("SELECT row_hash FROM audit_log ORDER BY id DESC LIMIT 1 FOR UPDATE")
+            text("SELECT row_hash FROM audit_log ORDER BY id DESC LIMIT 1")
         )
     ).scalar_one_or_none()
     prev = last or GENESIS

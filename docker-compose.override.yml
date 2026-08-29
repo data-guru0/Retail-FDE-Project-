@@ -14,6 +14,7 @@ services:
       - ./worker:/app
       - ./ml:/app/ml
       - ./scenarios:/app/scenarios:ro
+      - ./docs:/app/docs
       - vault_creds:/vault-creds:ro
     ports: ["9100:9100"]
 
