@@ -29,6 +29,8 @@ class Settings(BaseModel):
     groq_api_key: str
 
     keycloak_issuer: str
+    keycloak_jwks_url: str
+    keycloak_internal_url: str
     keycloak_audience: str
 
     langfuse_host: str
@@ -69,7 +71,9 @@ def get_settings() -> Settings:
         openai_api_key=llm.get("openai_api_key", ""),
         groq_api_key=llm.get("groq_api_key", ""),
         keycloak_issuer=kc["issuer"],
-        keycloak_audience=kc.get("audience", "returnguard-backend"),
+        keycloak_jwks_url=kc["jwks_url"],
+        keycloak_internal_url=kc["internal_url"],
+        keycloak_audience=kc.get("audience", "account"),
         langfuse_host=lf["host"],
         langfuse_public_key=lf["public_key"],
         langfuse_secret_key=lf["secret_key"],

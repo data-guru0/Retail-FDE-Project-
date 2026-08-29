@@ -34,9 +34,13 @@ vault kv put secret/returnguard/llm \
   groq_api_key="${GROQ_API_KEY:-}" \
   bifrost_url="http://bifrost:8080"
 
+# `issuer` is what the browser/frontend sees (token `iss` claim); `jwks_url` is
+# what the backend container can actually reach to fetch signing keys.
 vault kv put secret/returnguard/keycloak \
-  issuer="http://keycloak:8080/realms/returnguard" \
-  audience="returnguard-backend"
+  issuer="http://localhost:8081/realms/returnguard" \
+  jwks_url="http://keycloak:8080/realms/returnguard/protocol/openid-connect/certs" \
+  internal_url="http://keycloak:8080/realms/returnguard" \
+  audience="account"
 
 vault kv put secret/returnguard/langfuse \
   host="http://langfuse-web:3000" \

@@ -272,6 +272,7 @@ services:
       vault-init: {condition: service_completed_successfully}
     volumes:
       - vault_creds:/vault-creds:ro
+      - ./seed:/app/seed:ro
     ports: ["8000:8000"]
     networks: [rg]
     entrypoint: ["/bin/sh", "-c", ". /vault-creds/backend.env 2>/dev/null; exec \"$0\" \"$@\""]

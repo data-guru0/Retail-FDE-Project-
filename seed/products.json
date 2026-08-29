@@ -1,0 +1,263 @@
+[
+  {
+    "sku": "RG-001",
+    "name": "Aurora 27\" 4K Monitor",
+    "description": "27-inch 3840x2160 IPS display, 99% sRGB, USB-C 90W power delivery, height-adjustable stand.",
+    "category": "Electronics",
+    "price": 329.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-001/900/900"
+  },
+  {
+    "sku": "RG-002",
+    "name": "Nimbus Wireless Headphones",
+    "description": "Over-ear active noise cancelling, 40h battery, multipoint Bluetooth 5.3, USB-C fast charge.",
+    "category": "Electronics",
+    "price": 149.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-002/900/900"
+  },
+  {
+    "sku": "RG-003",
+    "name": "Pulse Mechanical Keyboard",
+    "description": "75% hot-swappable mechanical keyboard, tactile brown switches, PBT keycaps, RGB, wired/2.4GHz/BT.",
+    "category": "Electronics",
+    "price": 109.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-003/900/900"
+  },
+  {
+    "sku": "RG-004",
+    "name": "Vertex Wireless Mouse",
+    "description": "Lightweight 58g ergonomic mouse, 26k DPI sensor, 70h battery, USB-C.",
+    "category": "Electronics",
+    "price": 59.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-004/900/900"
+  },
+  {
+    "sku": "RG-005",
+    "name": "Cobalt USB-C Hub 8-in-1",
+    "description": "HDMI 4K60, 100W PD passthrough, 2x USB-A 3.2, SD/microSD, Gigabit Ethernet.",
+    "category": "Electronics",
+    "price": 44.95,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-005/900/900"
+  },
+  {
+    "sku": "RG-006",
+    "name": "Lumen Desk Lamp",
+    "description": "LED task lamp, 5 colour temperatures, stepless dimming, USB-A charging port, memory setting.",
+    "category": "Electronics",
+    "price": 39.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-006/900/900"
+  },
+  {
+    "sku": "RG-007",
+    "name": "Echo Portable Bluetooth Speaker",
+    "description": "IP67 waterproof, 24h playtime, 360-degree sound, stereo pairing, carabiner clip.",
+    "category": "Electronics",
+    "price": 79.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-007/900/900"
+  },
+  {
+    "sku": "RG-008",
+    "name": "Flux 65W GaN Charger",
+    "description": "Compact 3-port (2x USB-C, 1x USB-A) GaN wall charger, foldable pins.",
+    "category": "Electronics",
+    "price": 34.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-008/900/900"
+  },
+  {
+    "sku": "RG-009",
+    "name": "Terra Ceramic Mug Set (4)",
+    "description": "12oz stoneware mugs, reactive glaze, dishwasher and microwave safe.",
+    "category": "Home & Kitchen",
+    "price": 32.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-009/900/900"
+  },
+  {
+    "sku": "RG-010",
+    "name": "Copper Pour-Over Coffee Kettle",
+    "description": "1L gooseneck kettle, stovetop, precision spout, heat-resistant handle.",
+    "category": "Home & Kitchen",
+    "price": 42.5,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-010/900/900"
+  },
+  {
+    "sku": "RG-011",
+    "name": "Nordic Cast Iron Skillet 10\"",
+    "description": "Pre-seasoned cast iron, pour spouts, helper handle, oven safe to 260C.",
+    "category": "Home & Kitchen",
+    "price": 38.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-011/900/900"
+  },
+  {
+    "sku": "RG-012",
+    "name": "Verde Chef's Knife 8\"",
+    "description": "High-carbon German stainless steel, full tang, ergonomic bolster.",
+    "category": "Home & Kitchen",
+    "price": 64.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-012/900/900"
+  },
+  {
+    "sku": "RG-013",
+    "name": "Linen Duvet Cover Set Queen",
+    "description": "Stonewashed 100% French flax linen, button closure, 2 pillowcases.",
+    "category": "Home & Kitchen",
+    "price": 129.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-013/900/900"
+  },
+  {
+    "sku": "RG-014",
+    "name": "Bamboo Cutting Board Trio",
+    "description": "Three organic bamboo boards with juice groove, non-slip feet.",
+    "category": "Home & Kitchen",
+    "price": 27.99,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-014/900/900"
+  },
+  {
+    "sku": "RG-015",
+    "name": "Aroma Glass Food Storage (10 pc)",
+    "description": "Borosilicate glass containers with airtight locking lids, oven/freezer safe.",
+    "category": "Home & Kitchen",
+    "price": 45.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-015/900/900"
+  },
+  {
+    "sku": "RG-016",
+    "name": "Halcyon Scented Soy Candle",
+    "description": "220g hand-poured soy wax, cedar and amber, 55h burn, cotton wick.",
+    "category": "Home & Kitchen",
+    "price": 24.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-016/900/900"
+  },
+  {
+    "sku": "RG-017",
+    "name": "Everyday Merino Crew Sweater",
+    "description": "100% machine-washable merino wool, mid-weight, ribbed cuffs, unisex.",
+    "category": "Apparel",
+    "price": 98.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-017/900/900"
+  },
+  {
+    "sku": "RG-018",
+    "name": "Trailhead Rain Shell",
+    "description": "2.5-layer waterproof breathable jacket, taped seams, packable, adjustable hood.",
+    "category": "Apparel",
+    "price": 139.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-018/900/900"
+  },
+  {
+    "sku": "RG-019",
+    "name": "Weekend Organic Cotton Tee",
+    "description": "220gsm heavyweight organic cotton, boxy fit, garment-dyed.",
+    "category": "Apparel",
+    "price": 28.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-019/900/900"
+  },
+  {
+    "sku": "RG-020",
+    "name": "Commuter Chino Pants",
+    "description": "4-way stretch cotton-nylon twill, gusseted crotch, hidden zip pocket.",
+    "category": "Apparel",
+    "price": 78.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-020/900/900"
+  },
+  {
+    "sku": "RG-021",
+    "name": "Alpine Wool Blend Beanie",
+    "description": "Rib-knit merino and acrylic blend, cuffed, one size.",
+    "category": "Apparel",
+    "price": 22.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-021/900/900"
+  },
+  {
+    "sku": "RG-022",
+    "name": "Meridian Leather Belt",
+    "description": "Full-grain vegetable-tanned leather, solid brass buckle, made to last.",
+    "category": "Apparel",
+    "price": 55.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-022/900/900"
+  },
+  {
+    "sku": "RG-023",
+    "name": "Cloudstep Knit Sneakers",
+    "description": "Recycled knit upper, cork footbed, rubber outsole, machine washable.",
+    "category": "Apparel",
+    "price": 95.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-023/900/900"
+  },
+  {
+    "sku": "RG-024",
+    "name": "Summit 30L Hiking Backpack",
+    "description": "Ventilated back panel, hip belt, rain cover, hydration sleeve, 1.1kg.",
+    "category": "Sports & Outdoors",
+    "price": 89.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-024/900/900"
+  },
+  {
+    "sku": "RG-025",
+    "name": "Cirrus Double-Wall Water Bottle",
+    "description": "710ml 18/8 stainless steel, vacuum insulated 24h cold, leakproof lid.",
+    "category": "Sports & Outdoors",
+    "price": 32.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-025/900/900"
+  },
+  {
+    "sku": "RG-026",
+    "name": "Grip Pro Yoga Mat",
+    "description": "5mm TPE, closed-cell, alignment lines, carry strap, non-slip.",
+    "category": "Sports & Outdoors",
+    "price": 48.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-026/900/900"
+  },
+  {
+    "sku": "RG-027",
+    "name": "Torque Adjustable Dumbbell (Single)",
+    "description": "5-25kg per hand, dial adjust, compact tray, cast metal plates.",
+    "category": "Sports & Outdoors",
+    "price": 199.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-027/900/900"
+  },
+  {
+    "sku": "RG-028",
+    "name": "Nightbeam Rechargeable Bike Light Set",
+    "description": "Front 800lm + rear 60lm, USB-C, IPX5, quick-release mounts.",
+    "category": "Sports & Outdoors",
+    "price": 36.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-028/900/900"
+  },
+  {
+    "sku": "RG-029",
+    "name": "Baseline Insulated Camp Blanket",
+    "description": "Recycled ripstop shell, synthetic fill, packs to 1L, water resistant.",
+    "category": "Sports & Outdoors",
+    "price": 62.0,
+    "stock": 100,
+    "image_url": "https://picsum.photos/seed/RG-029/900/900"
+  }
+]

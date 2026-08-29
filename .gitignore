@@ -26,3 +26,7 @@ ml/detector_bakeoff/models/
 # os
 .DS_Store
 Thumbs.db
+
+node_modules/
+.next/
+next-env.d.ts
