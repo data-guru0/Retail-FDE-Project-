@@ -51,18 +51,18 @@ def main() -> None:
     ap.add_argument("--factor", type=int, default=20)
     ap.add_argument("--concurrency", type=int, default=4)
     a = ap.parse_args()
-    print(f"submitting {a.factor} returns, concurrency {a.concurrency}…")
+    print(f"submitting {a.factor} returns, concurrency {a.concurrency}...")
     start = time.time()
     with cf.ThreadPoolExecutor(max_workers=a.concurrency) as ex:
         times = sorted(t for t in ex.map(one, range(a.factor)) if t == t)
     wall = time.time() - start
     if not times:
-        print("no returns completed — check the worker")
+        print("no returns completed - check the worker")
         return
     p95 = times[max(0, int(len(times) * 0.95) - 1)]
     print(f"\ncompleted {len(times)}/{a.factor} in {wall:.0f}s wall")
     print(f"time-to-decision  p50={statistics.median(times):.1f}s  p95={p95:.1f}s  max={max(times):.1f}s")
-    print(f"throughput ≈ {len(times) / wall * 60:.1f} decisions/min "
+    print(f"throughput ~ {len(times) / wall * 60:.1f} decisions/min "
           f"(scale with `docker compose up -d --scale worker=N`)")
 
 

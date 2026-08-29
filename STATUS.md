@@ -42,23 +42,31 @@ Run all: `python scripts/smoke.py`
 - `README.md` written from the real running system (setup commands were all run;
   troubleshooting is the real list of things that broke).
 
-## Partial / not exercised
+## Done (M6 pass)
 
-- **M6 demo walkthrough** — `README.md` documents the 8 `[demo]` scenarios and
-  `run_scenarios.py` covers the automatable decision-behaviour ones; they are not
-  each hand-walked in the browser UI with screenshots.
-- **`scripts/loadtest.py`** — written (concurrent submit + p50/p95), not driven at
-  full 20× yet. The scaling lever (`--scale worker=N`) is real.
-- **`scripts/backup.sh` / `restore.sh`** — written, `pg_dump` + Qdrant snapshot
-  paths tested piecemeal, not a full round trip.
-- **Observability profile** — Prometheus/Grafana compose services + Grafana
-  datasource/dashboard provisioning exist; the worker `/metrics` endpoint and the
-  dashboard JSON are not wired. Langfuse (the primary observability surface) is
-  fully working.
-- **Auto-approve happy path** — the code + `assist`/`auto` gating + threshold
-  tuning are verified; seeing the pipeline actually emit `auto_approve` needs a
-  fixture photo that CLIP matches to its product (the current fixtures are
-  deliberately mismatched, so easy cases escalate on the image check).
+- **Auto-approve happy path** — scenario **A0** (`run_scenarios.py A0`): an
+  established customer returns a $32 item 3 days out with a photo that IS the
+  product (CLIP ≈ 1.0), at `assist`. The pipeline **auto-approves** →
+  `status=approved`, `refund_state=pending`, `audit_log action=auto_approve`, a
+  QA sample lands. (Required raising the Critic's veto bar — prompt v4 — so it
+  stops vetoing clean cases on hypotheticals.)
+- **Observability profile** — `docker compose --profile observability up -d`:
+  Prometheus scrapes backend + bifrost + **worker `:9100`** (all `up`); Grafana
+  auto-loads the **ReturnGuard dashboard** (pipeline runs by route, error/DLQ
+  rate, LLM spend + 24h ceiling, agreement gauge, oldest-escalation, p50/p95
+  time-to-decision, API request rate).
+- **`docs/DEMO.md`** — the 8 `[demo]` scenarios as a runnable + observable
+  transcript (steps → what to see → why it matters).
+- **`scripts/loadtest.py`** — fixed; run at 15× with `--scale worker=3`
+  (numbers in `docs/RUNBOOK.md`).
+
+## Partial
+
+- **`scripts/backup.sh` / `restore.sh`** — pg_dump + Qdrant-snapshot round trip
+  exercised; the MinIO mirror step needs a persistent run target on Windows
+  (noted in the script).
+- The 8 demo scenarios are documented + the automatable ones scripted; not each
+  hand-clicked in the browser with screenshots.
 
 ## Known deviations from CLAUDE.md (each recorded in an ADR)
 

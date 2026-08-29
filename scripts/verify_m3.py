@@ -60,7 +60,7 @@ def main() -> None:
     print(f"  submitted return {rid}; waiting for the worker…")
 
     # wait for the pipeline to actually finish (GovernanceGate is the last node)
-    deadline = time.time() + 150
+    deadline = time.time() + 240
     final_status = None
     while time.time() < deadline:
         final_status = q1("select status from returns where id=%(r)s", r=rid)

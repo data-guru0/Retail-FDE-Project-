@@ -56,11 +56,13 @@ reembed-policy: ## embed the active policy docs into Qdrant
 	$(COMPOSE) run --rm worker python -m pipeline.policy_index
 
 mcp-setup: ## configure ContextForge: gateway + per-agent virtual servers
-	$(COMPOSE) run --rm -e ADMIN_PASS=$$KEYCLOAK_ADMIN_PASSWORD \
-	  -v $(PWD)/scenarios:/out mcp-server python /app/../infra/mcp-gateway/setup.py || true
+	python scripts/mcp_setup.py
 
-m4-setup: dataset train reembed-policy ## everything the M4 pipeline needs before it can run
-	@echo "M4 setup complete (dataset + model + policy index)"
+bifrost-setup: ## register per-agent Bifrost virtual keys (model scope + budget + rate limit)
+	python scripts/bifrost_setup.py
+
+m4-setup: dataset train reembed-policy mcp-setup bifrost-setup ## everything the M4+ pipeline needs
+	@echo "setup complete (dataset + model + policy index + ContextForge + Bifrost VKs)"
 
 loadtest: ## ~20x return volume
 	python scripts/loadtest.py
@@ -71,4 +73,4 @@ backup: ## pg_dump + qdrant snapshot + minio mirror
 restore: ## restore from backups/
 	@bash scripts/restore.sh
 
-.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init smoke scenarios demo dataset train loadtest backup restore reembed-policy mcp-setup m4-setup
+.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init smoke scenarios demo dataset train loadtest backup restore reembed-policy mcp-setup bifrost-setup m4-setup

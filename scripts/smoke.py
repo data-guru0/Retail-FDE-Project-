@@ -14,6 +14,7 @@ CHECKS = [
     "verify_m3.py", "verify_m3_dlq.py",
     "verify_m4.py", "verify_audit_chain.py",
     "run_scenarios.py", "verify_security.py", "verify_m5.py",
+    "verify_m6.py",
 ]
 
 

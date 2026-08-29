@@ -1,16 +1,44 @@
 """Thin LLM client: the OpenAI SDK pointed at Bifrost. No retry/fallback/circuit
-logic here — Bifrost owns all of that (ADR-0007). We just pass the fallback list
-and the per-agent virtual key, and record what came back.
+logic here — Bifrost owns all of that (ADR-0007). We pass the fallback list, the
+per-agent Bifrost virtual key when one is configured, and — always — enforce the
+per-agent model-role grant (`models_config.assert_grant`) before the call.
 """
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 
 from openai import OpenAI
 
-from pipeline.models_config import fallbacks, model
+from pipeline.models_config import assert_grant, fallbacks, model
 from pipeline.settings import get_settings
+
+
+def _vk_for(agent: str | None) -> str | None:
+    """Per-agent Bifrost virtual key (scripts/bifrost_setup.py registers these
+    with model allow-lists + monthly budgets; values in Vault).
+
+    Only sent on the inference hot path when RG_USE_BIFROST_VK=1. Off by default:
+    OSS Bifrost v2.0.0's virtual-key -> provider-credential binding needs a key
+    registration path that env/file provider keys don't satisfy locally
+    (ADR-0007). The per-agent **model** least-privilege is enforced regardless,
+    in models_config.assert_grant() above.
+    """
+    if not agent or os.getenv("RG_USE_BIFROST_VK") != "1":
+        return None
+    env = os.getenv(f"RG_BIFROST_VK_{agent.upper()}")
+    if env:
+        return env
+    try:
+        import json
+
+        from pipeline.settings import _read
+
+        keys = _read("bifrost").get("agent_keys")
+        return json.loads(keys).get(agent) if keys else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 @dataclass
@@ -37,11 +65,14 @@ def chat(
     system: str,
     user: str,
     *,
+    agent: str | None = None,
     virtual_key: str | None = None,
     max_tokens: int = 1200,
     temperature: float = 0.1,
     json_mode: bool = True,
 ) -> LLMResult:
+    assert_grant(agent, role)              # per-agent least privilege on models
+    virtual_key = virtual_key or _vk_for(agent)
     m = model(role)
     fb = fallbacks(role)
     extra: dict = {}
@@ -77,11 +108,14 @@ def chat(
 
 
 def chat_vision(*, role: str, system: str, text: str, image_bytes: bytes,
-                virtual_key: str | None = None, max_tokens: int = 300) -> str:
+                agent: str | None = None, virtual_key: str | None = None,
+                max_tokens: int = 300) -> str:
     """Vision call via Bifrost. Image is inlined as a base64 data URL (OpenAI's
     servers can't reach our local MinIO)."""
     import base64
 
+    assert_grant(agent, role)
+    virtual_key = virtual_key or _vk_for(agent)
     b64 = base64.b64encode(image_bytes).decode()
     resp = _client(virtual_key).chat.completions.create(
         model=model(role),

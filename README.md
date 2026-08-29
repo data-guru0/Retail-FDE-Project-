@@ -147,8 +147,10 @@ make seed
 #    embed the policy docs into Qdrant
 make m4-setup
 
-# 5. configure ContextForge: register the tools server + per-agent virtual servers
+# 5. gateways: ContextForge per-agent tool servers + Bifrost per-agent model keys
+#    (also run by `make m4-setup` above)
 python scripts/mcp_setup.py
+python scripts/bifrost_setup.py
 
 # 6. frontend (runs on the host, not in Docker)
 cd frontend && npm install && npm run dev      # http://localhost:3000

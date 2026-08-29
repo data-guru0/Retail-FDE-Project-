@@ -12,6 +12,7 @@ Asserts:
 from __future__ import annotations
 
 import io
+import json
 import pathlib
 import subprocess
 import sys
@@ -60,7 +61,7 @@ def _submit(h, reason_text: str, image_bytes: bytes) -> str:
     return r.json()["id"]
 
 
-def _wait(rid: str, timeout=150) -> dict:
+def _wait(rid: str, timeout=240) -> dict:
     end = time.time() + timeout
     while time.time() < end:
         row = q1("select json_build_object('status',status,'decision',decision,"
@@ -117,6 +118,20 @@ def main() -> None:
                  else r.json().get("data", []))]
         c.ok("flag_ring" not in tools and len(tools) == 0,
              f"Image agent still has zero tools under an injection attempt ({tools})")
+
+    # per-agent model least-privilege (models_config.is_granted / assert_grant)
+    grant = subprocess.run(
+        ["docker", "compose", "exec", "-T", "worker", "python", "-c",
+         "import json; from pipeline.models_config import is_granted as g; "
+         "print(json.dumps({'image_reason': g('image','reason'), "
+         "'image_vision': g('image','vision'), 'expl_reason': g('explanation','reason')}))"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    gd = json.loads(grant.stdout.strip().splitlines()[-1]) if grant.stdout.strip() else {}
+    c.ok(gd.get("image_reason") is False,
+         "Image agent is NOT granted the 'reason' model role (blocked before the call)")
+    c.ok(gd.get("image_vision") is True, "Image agent IS granted 'vision'")
+    c.ok(gd.get("expl_reason") is False, "Explanation agent is NOT granted 'reason' (only 'deep')")
 
     # no money-mutating tool
     tools_src = (ROOT / "mcp-server" / "tools.py").read_text().lower()

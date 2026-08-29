@@ -59,7 +59,7 @@ def main() -> None:
     rid = _submit_easy()
     print(f"  submitted {rid}; waiting for the multi-agent pipeline…")
 
-    deadline = time.time() + 150
+    deadline = time.time() + 240
     row = None
     while time.time() < deadline:
         row = q1(

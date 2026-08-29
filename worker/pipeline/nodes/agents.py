@@ -196,6 +196,7 @@ async def _vision_llm(rc: RunCtx, state: dict, ctx: dict) -> dict | None:
         return None
     try:
         res = chat_vision(
+            agent="image",
             role="vision",
             system="You compare a customer's return photo to the product they ordered. "
                    "Answer ONLY JSON: {\"matches\": true|false, \"note\": \"<short>\"}",

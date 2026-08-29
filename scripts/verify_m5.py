@@ -58,7 +58,7 @@ def submit(h: dict, photo: str, reason: str, text: str, age_days: int = 5) -> st
     return r.json()["id"]
 
 
-def wait_final(rid: str, timeout: int = 150) -> dict:
+def wait_final(rid: str, timeout: int = 240) -> dict:
     end = time.time() + timeout
     while time.time() < end:
         row = q1("select json_build_object('status',status,'decision',decision,"

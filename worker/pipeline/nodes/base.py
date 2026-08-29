@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from dataclasses import dataclass
 
 import structlog
@@ -22,10 +21,6 @@ log = structlog.get_logger()
 SA_SUBJECT = {a: f"service-account-returnguard-agent-{a}" for a in
               ("planner", "intake", "policy", "image", "behavior",
                "decision", "critic", "explanation")}
-
-# Bifrost virtual key per agent (spend cap / model scope). Falls back to no key.
-def virtual_key(agent: str) -> str | None:
-    return os.getenv(f"RG_BIFROST_VK_{agent.upper()}")
 
 
 @dataclass
@@ -58,12 +53,11 @@ async def run_llm_agent(
     system, _, _ = load(prompt_name)
     user = facts if isinstance(facts, str) else json.dumps(facts, indent=2, default=str)
     input_hash = hashlib.sha256(user.encode()).hexdigest()
-    vk = virtual_key(agent)
 
     await rc.emit(state, "node_start", agent, {"prompt": prompt_version(prompt_name), "role": role})
-    result = chat(role, system, user, virtual_key=vk, max_tokens=max_tokens)
+    result = chat(role, system, user, agent=agent, max_tokens=max_tokens)
     parsed, result = parse_validated(
-        result, schema, role=role, system=system, user=user, virtual_key=vk
+        result, schema, role=role, system=system, user=user, agent=agent
     )
     if merge:
         parsed.update(merge)

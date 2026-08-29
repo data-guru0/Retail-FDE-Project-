@@ -1,5 +1,6 @@
-"""Lazy-loaded local CPU models: CLIP (photo similarity) + an AI-image detector.
-Both load on first use and stay resident. Zero API cost.
+"""Lazy-loaded local models: CLIP (photo similarity) + an AI-image detector.
+Both load on first use and stay resident. Zero API cost. CPU by default; set
+RG_TORCH_DEVICE=cuda (docker-compose.gpu.yml) to use the GPU.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ _detector = None
 
 # chosen by the ml/detector_bakeoff/ run (ADR-0002): acc 0.92, separation 0.82
 DETECTOR_MODEL = os.getenv("RG_AI_DETECTOR", "haywoodsloan/ai-image-detector-deploy")
+_DEVICE = os.getenv("RG_TORCH_DEVICE", "cpu")
 
 
 def _load_clip():
@@ -29,9 +31,10 @@ def _load_clip():
                 model, _, preprocess = open_clip.create_model_and_transforms(
                     "ViT-B-32", pretrained="laion2b_s34b_b79k"
                 )
-                model.eval()
-                _clip = {"model": model, "preprocess": preprocess, "torch": torch}
-                log.info("models_local.clip_loaded")
+                dev = _DEVICE if (_DEVICE == "cpu" or torch.cuda.is_available()) else "cpu"
+                model.eval().to(dev)
+                _clip = {"model": model, "preprocess": preprocess, "torch": torch, "device": dev}
+                log.info("models_local.clip_loaded", device=dev)
     return _clip
 
 
@@ -45,7 +48,7 @@ def clip_similarity(image_a: bytes, image_b: bytes) -> float:
         embs = []
         for raw in (image_a, image_b):
             img = Image.open(io.BytesIO(raw)).convert("RGB")
-            t = c["preprocess"](img).unsqueeze(0)
+            t = c["preprocess"](img).unsqueeze(0).to(c["device"])
             e = c["model"].encode_image(t)
             e = e / e.norm(dim=-1, keepdim=True)
             embs.append(e)

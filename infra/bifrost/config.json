@@ -1,11 +1,13 @@
 {
   "client": {
-    "drop_excess_requests": false
+    "drop_excess_requests": false,
+    "allow_direct_keys": true
   },
   "providers": {
     "openai": {
       "keys": [
         {
+          "id": "openai-main",
           "value": "env.OPENAI_API_KEY",
           "models": ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "text-embedding-3-small"],
           "weight": 1.0
@@ -15,6 +17,7 @@
     "groq": {
       "keys": [
         {
+          "id": "groq-main",
           "value": "env.GROQ_API_KEY",
           "models": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"],
           "weight": 1.0

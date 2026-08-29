@@ -96,7 +96,7 @@ async def seed_products() -> int:
             ).on_conflict_do_update(
                 index_elements=["sku"],
                 set_={"name": p["name"], "description": p["description"],
-                      "category": p["category"], "price": p["price"], "image_key": key},
+                      "category": p["category"], "price": p["price"], "image_key": key, "stock": p["stock"]},
             )
             await s.execute(stmt)
             n += 1

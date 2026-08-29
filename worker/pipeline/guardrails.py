@@ -27,7 +27,7 @@ def parse_validated(
     role: str,
     system: str,
     user: str,
-    virtual_key: str | None = None,
+    agent: str | None = None,
 ) -> tuple[dict, LLMResult]:
     """Returns (parsed_obj, final_result). final_result is the repaired call if one
     was needed (so tokens/cost/latency reflect the real total)."""
@@ -47,7 +47,7 @@ def parse_validated(
         f"{user}\n\nYour previous reply was invalid: {problem}\n"
         f"Previous reply:\n{result.text}\n\n"
         f"Return ONLY valid JSON matching the schema. No prose, no code fences.",
-        virtual_key=virtual_key,
+        agent=agent,
         max_tokens=1400,
     )
     obj = _extract_json(repair.text)

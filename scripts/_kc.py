@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import httpx
 
+import os
+
 from _rg import _E
 
-KC = "http://localhost:8081"
+KC = os.getenv("RG_KEYCLOAK", "http://localhost:8081")
 REALM = "returnguard"
-ADMIN_USER = _E.get("KEYCLOAK_ADMIN", "admin")
-ADMIN_PASS = _E.get("KEYCLOAK_ADMIN_PASSWORD", "")
+ADMIN_USER = _E.get("KEYCLOAK_ADMIN") or os.getenv("KEYCLOAK_ADMIN", "admin")
+ADMIN_PASS = _E.get("KEYCLOAK_ADMIN_PASSWORD") or os.getenv("KEYCLOAK_ADMIN_PASSWORD", "")
 
 
 def admin_token() -> str:
