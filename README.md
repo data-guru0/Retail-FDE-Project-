@@ -123,8 +123,12 @@ in `docs/decisions/`.
 
 ## Run it from a clean checkout
 
-**Prerequisites:** Docker Desktop (running), Node 24+, Python 3.11+ on the host
-(only for the thin verify scripts), `make`. ~9 GB RAM free for the full stack.
+**Prerequisites:** Docker Desktop (running), Node 24+, Python 3.11+ on the host,
+`make`. ~9 GB RAM free for the full stack.
+
+```bash
+pip install -r scripts/requirements.txt   # host deps for the verify/setup scripts
+```
 
 ```bash
 # 1. secrets — copy the template and fill in the two API keys + any strong

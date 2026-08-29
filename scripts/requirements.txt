@@ -1,0 +1,6 @@
+# Host-side deps for the verify_* / scenario / setup scripts.
+#   pip install -r scripts/requirements.txt
+httpx==0.28.1
+psycopg[binary]==3.3.4
+websockets==15.0.1
+PyJWT[crypto]==2.10.1
