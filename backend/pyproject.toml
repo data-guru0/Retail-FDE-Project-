@@ -1,0 +1,41 @@
+[project]
+name = "returnguard-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi==0.141.1",
+  "uvicorn[standard]==0.52.4",
+  "sqlalchemy[asyncio]==2.0.52",
+  "psycopg[binary,pool]==3.3.4",
+  "alembic==1.19.1",
+  "pydantic==2.13.5",
+  "pydantic-settings==2.15.0",
+  "hvac==2.4.0",
+  "structlog==26.1.0",
+  "httpx==0.28.1",
+  "redis==6.1.1",
+  "boto3==1.43.83",
+  "qdrant-client==1.19.0",
+  "python-multipart==0.0.32",
+  "Pillow==12.3.0",
+  "PyJWT[crypto]==2.13.0",
+  "slowapi==0.1.10",
+  "prometheus-client==0.26.0",
+  "langfuse==3.0.4",
+  "websockets==17.1",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true

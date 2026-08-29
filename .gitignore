@@ -1,0 +1,28 @@
+# secrets
+.env
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# node
+node_modules/
+.next/
+frontend/lib/api/generated.ts
+
+# data / artifacts
+backups/
+ml/registry/*/model.joblib
+ml/detector_bakeoff/models/
+*.log
+
+# os
+.DS_Store
+Thumbs.db

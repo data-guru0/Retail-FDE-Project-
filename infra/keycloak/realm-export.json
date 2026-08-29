@@ -1,0 +1,281 @@
+{
+  "realm": "returnguard",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 3600,
+  "roles": {
+    "realm": [
+      {
+        "name": "customer"
+      },
+      {
+        "name": "reviewer"
+      },
+      {
+        "name": "admin"
+      }
+    ]
+  },
+  "defaultRoles": [
+    "customer"
+  ],
+  "requiredCredentials": [
+    "password"
+  ],
+  "clients": [
+    {
+      "clientId": "returnguard-web",
+      "name": "ReturnGuard Web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-backend",
+      "name": "ReturnGuard Backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "4iS-iMVOBEeddhYnJtGc3G03o6XStMNv",
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [],
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-planner",
+      "name": "Agent: planner",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "wFvWHhGfiY8QXaTi1E-qYThfv7vYl1rh",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "planner"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-intake",
+      "name": "Agent: intake",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "k6Fg8crCd3wAkV-vqQkcmYcxDhNnG1qs",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "intake"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-policy",
+      "name": "Agent: policy",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "yLIRY7DtmcC1RbvJh92_IPrUVk0K9zv5",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "policy"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-image",
+      "name": "Agent: image",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "Xv37qemOLIM2XrIqmO_gNRXvFI1O7D_Z",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "image"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-behavior",
+      "name": "Agent: behavior",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "_bCOSNJmtDfCgLJ3j8T0JvfdBO4J-9rr",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "behavior"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-decision",
+      "name": "Agent: decision",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "0hJiEJ6pueBoGLNB2g7XjuIAENdqxghM",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "decision"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-critic",
+      "name": "Agent: critic",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "pPqUIt8NwGpjTPkeue1WLNK3VY0Y6Bg4",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "critic"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "returnguard-agent-explanation",
+      "name": "Agent: explanation",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "OvJ2goGLE_K_x7vUNknnXnHzcgclsYOn",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "agent.name": "explanation"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "reviewer1@returnguard.local",
+      "email": "reviewer1@returnguard.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Rita",
+      "lastName": "Reviewer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "reviewer1",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "reviewer"
+      ]
+    },
+    {
+      "username": "reviewer2@returnguard.local",
+      "email": "reviewer2@returnguard.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Raj",
+      "lastName": "Reviewer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "reviewer2",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "reviewer"
+      ]
+    },
+    {
+      "username": "admin1@returnguard.local",
+      "email": "admin1@returnguard.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin1",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin",
+        "reviewer"
+      ]
+    }
+  ]
+}

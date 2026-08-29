@@ -1,0 +1,14 @@
+<clickhouse>
+    <!-- Cap ClickHouse footprint for the local box (~2 GB target). -->
+    <max_server_memory_usage>2000000000</max_server_memory_usage>
+    <mark_cache_size>268435456</mark_cache_size>
+    <uncompressed_cache_size>134217728</uncompressed_cache_size>
+    <mmap_cache_size>256</mmap_cache_size>
+    <compiled_expression_cache_size>67108864</compiled_expression_cache_size>
+    <profiles>
+        <default>
+            <max_memory_usage>1500000000</max_memory_usage>
+            <max_bytes_before_external_group_by>800000000</max_bytes_before_external_group_by>
+        </default>
+    </profiles>
+</clickhouse>

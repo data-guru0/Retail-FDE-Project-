@@ -1,0 +1,17 @@
+[project]
+name = "returnguard-mcp-server"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "mcp==2.1.1",
+  "uvicorn==0.52.4",
+  "psycopg[binary,pool]==3.3.4",
+  "structlog==26.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["server", "tools"]

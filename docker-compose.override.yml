@@ -1,0 +1,17 @@
+# Local dev tweaks: bind-mount source for live reload + so generated files
+# (alembic migrations, etc.) land on the host. Compose loads this automatically.
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - vault_creds:/vault-creds:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    volumes:
+      - ./worker:/app
+      - vault_creds:/vault-creds:ro
+
+  mcp-server:
+    volumes:
+      - ./mcp-server:/app

@@ -1,0 +1,318 @@
+x-env: &env
+  env_file: [.env]
+
+networks:
+  rg:
+    driver: bridge
+
+volumes:
+  pg_data:
+  redis_data:
+  qdrant_data:
+  minio_data:
+  vault_data:
+  vault_creds:
+  clickhouse_data:
+  langfuse_data:
+
+services:
+  # ----------------------------------------------------------------- datastores
+  postgres:
+    image: postgres:18
+    <<: *env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["5432:5432"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+    ports: ["6379:6379"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    volumes: [qdrant_data:/qdrant/storage]
+    ports: ["6333:6333", "6334:6334"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes: [minio_data:/data]
+    ports: ["9000:9000", "9001:9001"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio: {condition: service_healthy}
+    networks: [rg]
+    <<: *env
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb -p local/returnguard || true &&
+      mc mb -p local/langfuse || true &&
+      mc mb -p local/returnguard-langfuse-events || true &&
+      echo 'buckets ready'
+      "
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports: ["1025:1025", "8025:8025"]
+    networks: [rg]
+
+  vault:
+    image: hashicorp/vault:1.20
+    cap_add: [IPC_LOCK]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    command: server -dev
+    ports: ["8200:8200"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  vault-init:
+    image: hashicorp/vault:1.20
+    depends_on:
+      vault: {condition: service_healthy}
+    <<: *env
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
+    volumes:
+      - ./infra/vault/bootstrap.sh:/bootstrap.sh:ro
+      - vault_creds:/vault-creds
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    networks: [rg]
+
+  # ----------------------------------------------------------------- identity
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.2
+    command: start-dev --import-realm --health-enabled=true --http-port=8080
+    <<: *env
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/returnguard?currentSchema=keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: "-Xms256m -Xmx512m"
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports: ["8081:8080", "9002:9000"]
+    networks: [rg]
+
+  # ----------------------------------------------------------------- LLM gateway
+  bifrost:
+    image: maximhq/bifrost:v2.0.0
+    <<: *env
+    environment:
+      APP_PORT: "8080"
+      BIFROST_CONFIG_PATH: /app/config/config.json
+    volumes:
+      - ./infra/bifrost:/app/config
+    ports: ["8090:8080"]
+    networks: [rg]
+
+  # ----------------------------------------------------------------- MCP
+  mcp-server:
+    build: ./mcp-server
+    <<: *env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/returnguard
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ["8070:8070"]
+    networks: [rg]
+
+  mcp-gateway:
+    image: ghcr.io/ibm/mcp-context-forge:0.5.0
+    <<: *env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "4444"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mcpgw
+      REDIS_URL: redis://redis:6379/3
+      CACHE_TYPE: redis
+      JWT_SECRET_KEY: ${CONTEXTFORGE_JWT_SECRET}
+      AUTH_REQUIRED: "true"
+      BASIC_AUTH_USER: admin
+      BASIC_AUTH_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      PLATFORM_ADMIN_EMAIL: admin@returnguard.local
+      PLATFORM_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      MCPGATEWAY_UI_ENABLED: "true"
+      MCPGATEWAY_ADMIN_API_ENABLED: "true"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports: ["4444:4444"]
+    networks: [rg]
+
+  # ----------------------------------------------------------------- observability (Langfuse)
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3-alpine
+    environment:
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_SALT}
+      CLICKHOUSE_DB: default
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/low-mem.xml:/etc/clickhouse-server/config.d/low-mem.xml:ro
+    networks: [rg]
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "langfuse", "--password", "${LANGFUSE_SALT}", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    <<: *env
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/langfuse
+      SALT: ${LANGFUSE_SALT}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_SALT}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_CONNECTION_STRING: redis://redis:6379/4
+      LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: returnguard-langfuse-events
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_INIT_ORG_ID: returnguard
+      LANGFUSE_INIT_PROJECT_ID: returnguard
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: admin@returnguard.local
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    networks: [rg]
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    <<: *env
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+    depends_on:
+      langfuse-worker: {condition: service_started}
+      clickhouse: {condition: service_healthy}
+    ports: ["3001:3000"]
+    networks: [rg]
+
+  # ----------------------------------------------------------------- app
+  backend:
+    build: ./backend
+    <<: *env
+    environment:
+      RG_ENV: docker
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      vault: {condition: service_healthy}
+      vault-init: {condition: service_completed_successfully}
+    volumes:
+      - vault_creds:/vault-creds:ro
+    ports: ["8000:8000"]
+    networks: [rg]
+    entrypoint: ["/bin/sh", "-c", ". /vault-creds/backend.env 2>/dev/null; exec \"$0\" \"$@\""]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build: ./worker
+    <<: *env
+    environment:
+      RG_ENV: docker
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      vault: {condition: service_healthy}
+      vault-init: {condition: service_completed_successfully}
+      bifrost: {condition: service_started}
+    volumes:
+      - vault_creds:/vault-creds:ro
+    networks: [rg]
+    entrypoint: ["/bin/sh", "-c", ". /vault-creds/worker.env 2>/dev/null; exec \"$0\" \"$@\""]
+    command: ["arq", "pipeline.worker.WorkerSettings"]
+
+  # ----------------------------------------------------------------- observability profile
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    profiles: ["observability"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["9090:9090"]
+    networks: [rg]
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports: ["3002:3000"]
+    networks: [rg]

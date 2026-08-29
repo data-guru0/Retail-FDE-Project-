@@ -1,0 +1,43 @@
+[project]
+name = "returnguard-worker"
+version = "0.1.0"
+requires-python = ">=3.13"
+# Light deps for M3 (single-agent pipe). ML deps (torch/open-clip/sklearn/
+# transformers) are added at M4 in the [project.optional-dependencies] "ml" group
+# and installed into the image then.
+dependencies = [
+  "arq==0.28.0",
+  "redis==5.3.1",
+  "sqlalchemy[asyncio]==2.0.52",
+  "psycopg[binary,pool]==3.3.4",
+  "pydantic==2.13.5",
+  "hvac==2.4.0",
+  "structlog==26.1.0",
+  "httpx==0.28.1",
+  "openai==3.6.0",
+  "langgraph==1.2.11",
+  "langgraph-checkpoint-postgres==3.1.2",
+  "langfuse==3.0.4",
+  "jsonschema==4.26.0",
+  "boto3==1.43.83",
+  "qdrant-client==1.19.0",
+]
+
+[project.optional-dependencies]
+ml = [
+  "scikit-learn",
+  "numpy",
+  "pandas",
+  "joblib",
+  "open-clip-torch",
+  "torch",
+  "Pillow",
+  "transformers",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pipeline"]

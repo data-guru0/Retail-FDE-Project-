@@ -1,0 +1,23 @@
+groups:
+  - name: returnguard
+    rules:
+      - alert: QueueSLABreach
+        expr: rg_queue_oldest_seconds > 3600
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "A return has waited > 1h for a decision" }
+      - alert: DailyCostCeiling
+        expr: increase(rg_llm_cost_usd_total[24h]) > 20
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: "LLM spend over $20 in 24h" }
+      - alert: PipelineErrorSpike
+        expr: rate(rg_pipeline_errors_total[10m]) > 0.2
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "Pipeline error rate elevated" }
+      - alert: AgreementDrift
+        expr: rg_agent_human_agreement_ratio < 0.8
+        for: 30m
+        labels: { severity: warning }
+        annotations: { summary: "Agent-vs-human agreement below 80%" }
