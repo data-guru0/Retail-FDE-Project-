@@ -70,6 +70,27 @@ refund state transition is real.
   AppRoles are created by `bootstrap.sh` and the AppRole login path is in
   `vault.py` (fallback to token).
 
+## Completion pass — additional fixes verified
+
+- **torchvision::nms regression** (torch/torchvision ABI mismatch) — matched CPU
+  pair pinned; CLIP + detector work; full pipeline runs.
+- **Audit-chain fork under concurrency** — a latent bug: `SELECT tip FOR UPDATE` +
+  `LIMIT 1` doesn't re-scan when unblocked, so a backend append and a worker
+  append (e.g. `process_refunds`) could both chain from the same tip. Fixed: one
+  `pg_advisory_xact_lock` serialises every append across backend + worker.
+  `verify_audit_chain` + `verify_m5` green.
+- **Per-agent model least-privilege** — `models_config.assert_grant` enforced on
+  every LLM/vision call + tested (`verify_security`); real Bifrost per-agent
+  virtual keys (`scripts/bifrost_setup.py`) enforce model/provider scope at the
+  gateway (ADR-0007).
+- **A0 auto-approve** — retry a clean case up to 3× (LLM judgement varies) +
+  decision prompt v3; observed auto-approving through the real CLIP check.
+- **`process_refunds`** cron — approved → `refund_state=refunded` + audit +
+  email; customer tracker's final stage is real (`verify_m5`).
+- Worker startup **self-heal** for returns orphaned by a mid-graph kill.
+- `docker-compose.gpu.yml`, `load` compose profile, `verify_m6.py`,
+  `docs/MODEL_CARD.md`, `scripts/requirements.txt`, `infra/*/README` all added.
+
 ## Partial
 
 - The 8 demo scenarios are documented (`docs/DEMO.md`) + the automatable ones
@@ -78,6 +99,10 @@ refund state transition is real.
   (noted in the script); pg_dump + Qdrant snapshot round-trip works.
 - OTel spans from Bifrost/ContextForge → Langfuse are not wired; Langfuse traces
   come from the SDK (`record_generation`) and are real.
+- `infra/keycloak/realm-export.json` carries the local Keycloak **client**
+  secrets in plaintext (committed). Local-dev clients only; a hardening step
+  would move them to Vault + inject at import. `frontend/.env.local` (git-ignored)
+  holds the Auth.js + web-client secret (frontend runs on the host, no Vault).
 
 ## The one API-key caveat
 
