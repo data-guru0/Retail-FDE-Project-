@@ -146,6 +146,54 @@ async def reembed_policy(rctx: dict) -> dict:
     return out
 
 
+def _send_mail(to: str, subject: str, body: str) -> None:
+    import smtplib
+    from email.message import EmailMessage
+
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = "no-reply@returnguard.local", to, subject
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP("mailhog", 1025, timeout=10) as s:
+            s.send_message(msg)
+    except OSError as e:
+        log.warning("process_refunds.mail_failed", to=to, error=str(e))
+
+
+async def process_refunds(rctx: dict) -> int:
+    """Settle approved returns: refund_state pending -> refunded, + audit row +
+    customer email. No money moves — this is the state transition a payment
+    processor's settlement webhook would otherwise drive."""
+    from pipeline import audit
+
+    rows = await db.fetchall(
+        "SELECT r.id::text AS rid, r.amount, u.email "
+        "FROM returns r JOIN users u ON u.id = r.user_id "
+        "WHERE r.refund_state = 'pending' AND r.status = 'approved' "
+        "ORDER BY r.decided_at LIMIT 25"
+    )
+    n = 0
+    for row in rows:
+        updated = await db.fetchval(
+            "UPDATE returns SET refund_state = 'refunded', status = 'refunded' "
+            "WHERE id = %(r)s AND refund_state = 'pending' RETURNING id::text",
+            {"r": row["rid"]},
+        )
+        if not updated:
+            continue
+        await audit.append(
+            actor_type="system", actor_id="refund_processor", action="refund_issued",
+            entity_type="return", entity_id=row["rid"],
+            data={"amount_usd": float(row["amount"]), "note": "state transition only; no money moved"},
+        )
+        _send_mail(row["email"], "Your refund has been issued",
+                   f"Return {row['rid']}: ${row['amount']} refunded to your original payment method.")
+        n += 1
+    if n:
+        log.info("process_refunds.settled", n=n)
+    return n
+
+
 async def dispatch_outbox(rctx: dict) -> int:
     """Durability backstop: enqueue any return.submitted outbox row the backend's
     best-effort enqueue missed (older than 8s and still undispatched)."""

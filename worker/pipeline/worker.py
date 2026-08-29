@@ -5,7 +5,7 @@ import structlog
 from arq import cron
 
 from pipeline import db, metrics
-from pipeline.jobs import dispatch_outbox, reembed_policy, review_return
+from pipeline.jobs import dispatch_outbox, process_refunds, reembed_policy, review_return
 from pipeline.settings import redis_settings
 
 log = structlog.get_logger()
@@ -38,7 +38,8 @@ async def heartbeat(ctx: dict) -> str:
 
 
 class WorkerSettings:
-    functions = [review_return, dispatch_outbox, reembed_policy, refresh_metrics, heartbeat]
+    functions = [review_return, dispatch_outbox, reembed_policy, process_refunds,
+                 refresh_metrics, heartbeat]
     redis_settings = redis_settings()
     on_startup = startup
     on_shutdown = shutdown
@@ -49,4 +50,5 @@ class WorkerSettings:
         cron(heartbeat, minute=set(range(60)), run_at_startup=True),
         cron(dispatch_outbox, second={0, 10, 20, 30, 40, 50}, run_at_startup=True),
         cron(refresh_metrics, second={5, 20, 35, 50}, run_at_startup=True),
+        cron(process_refunds, second={15, 45}, run_at_startup=True),
     ]
