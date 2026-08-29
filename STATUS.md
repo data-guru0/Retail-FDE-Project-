@@ -33,20 +33,32 @@ Run all: `python scripts/smoke.py`
 - **ML model** trained + registered (`v20260829-021222`, ROC-AUC 0.81),
   `docs/MODEL_CARD.md` written, loaded by the Behavior agent by version.
 
-## Not built / partial (M6 + polish)
+## Done
 
-- **M6 README demo walkthrough** — `README.md` is written from the real system but
-  the 8 `[demo]` scenarios are not each hand-walked end to end with screenshots.
-- **`scripts/loadtest.py`** (~20× volume, p95) — stub; the queue/outbox design
-  handles it but it hasn't been driven at load.
-- **`scripts/backup.sh` / `restore.sh`** — written, not exercised.
-- **Observability profile** — Prometheus/Grafana compose services + provisioning
-  exist; the worker's `/metrics` endpoint and Grafana dashboards are not wired.
-- **Auto-approve happy path** — the code + `assist`-level gating are verified; a
-  case that CLIP-matches its product (so the pipeline actually auto-approves
-  rather than escalating on an image mismatch) needs a matching fixture photo.
-- `docs/`: ARCHITECTURE / GOVERNANCE / SECURITY / RUNBOOK / OPERATING_MODEL /
-  FAIRNESS — see what's present in `docs/`.
+- All 8 verify scripts + `run_scenarios.py` + `verify_audit_chain.py` +
+  `verify_security.py` pass (see the table above). `scripts/smoke.py` runs the lot.
+- `docs/`: ARCHITECTURE, GOVERNANCE, SECURITY, RUNBOOK, OPERATING_MODEL, FAIRNESS,
+  BASELINE, SCENARIOS, MODEL_CARD — all written. All 10 ADRs present.
+- `README.md` written from the real running system (setup commands were all run;
+  troubleshooting is the real list of things that broke).
+
+## Partial / not exercised
+
+- **M6 demo walkthrough** — `README.md` documents the 8 `[demo]` scenarios and
+  `run_scenarios.py` covers the automatable decision-behaviour ones; they are not
+  each hand-walked in the browser UI with screenshots.
+- **`scripts/loadtest.py`** — written (concurrent submit + p50/p95), not driven at
+  full 20× yet. The scaling lever (`--scale worker=N`) is real.
+- **`scripts/backup.sh` / `restore.sh`** — written, `pg_dump` + Qdrant snapshot
+  paths tested piecemeal, not a full round trip.
+- **Observability profile** — Prometheus/Grafana compose services + Grafana
+  datasource/dashboard provisioning exist; the worker `/metrics` endpoint and the
+  dashboard JSON are not wired. Langfuse (the primary observability surface) is
+  fully working.
+- **Auto-approve happy path** — the code + `assist`/`auto` gating + threshold
+  tuning are verified; seeing the pipeline actually emit `auto_approve` needs a
+  fixture photo that CLIP matches to its product (the current fixtures are
+  deliberately mismatched, so easy cases escalate on the image check).
 
 ## Known deviations from CLAUDE.md (each recorded in an ADR)
 
