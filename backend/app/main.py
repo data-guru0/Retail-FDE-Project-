@@ -49,11 +49,12 @@ def metrics():
 
 
 # Routers added in later milestones (shop, orders, returns, dashboard, ...).
-from app.routers import appeals, dashboard, orders, returns, shop, ws
+from app.routers import analytics, appeals, dashboard, orders, returns, shop, ws
 
 app.include_router(shop.router)
 app.include_router(orders.router)
 app.include_router(returns.router)
 app.include_router(ws.router)
 app.include_router(dashboard.router)
+app.include_router(analytics.router)
 app.include_router(appeals.router)

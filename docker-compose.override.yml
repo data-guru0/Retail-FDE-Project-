@@ -5,6 +5,7 @@ services:
     volumes:
       - ./backend:/app
       - ./seed:/app/seed:ro
+      - ./docs:/app/docs:ro
       - vault_creds:/vault-creds:ro
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
