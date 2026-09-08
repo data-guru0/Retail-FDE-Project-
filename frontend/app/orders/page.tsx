@@ -19,13 +19,19 @@ export default async function OrdersPage() {
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>My orders</h1>
       {orders.length === 0 && <p className="muted">No orders yet.</p>}
       {orders.map((o) => (
-        <Link key={o.id} href={`/orders/${o.id}`} className="card" style={{ padding: 14 }}>
+        <Link
+          key={o.id}
+          href={`/orders/${o.id}`}
+          className="card"
+          style={{ padding: 14 }}
+        >
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span>#{o.id.slice(0, 8)}</span>
             <span>${o.total}</span>
           </div>
           <div className="muted" style={{ fontSize: 13 }}>
-            {new Date(o.placed_at).toLocaleString()} · {o.items.length} item(s) · {o.status}
+            {new Date(o.placed_at).toLocaleString()} · {o.items.length} item(s)
+            · {o.status}
           </div>
         </Link>
       ))}

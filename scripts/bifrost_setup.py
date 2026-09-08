@@ -8,9 +8,11 @@ Each agent gets a virtual key with:
   - a per-minute request **rate limit**.
 
 Key values are written to Vault (secret/returnguard/bifrost -> agent_keys). They
-are sent on the inference hot path only when RG_USE_BIFROST_VK=1 — see ADR-0007
-for why (OSS Bifrost v2.0.0 VK->provider-credential binding). The per-agent
-**model** least-privilege is always enforced in worker/pipeline/models_config.py.
+are sent on the inference hot path only when RG_USE_BIFROST_VK=1 — OSS Bifrost
+v2.0.0's VK->provider-credential binding needs a key-registration path that
+env/file provider keys don't satisfy locally, so by default the per-agent
+**model** least-privilege is enforced in `worker/pipeline/models_config.py`
+(and OPA `authz.rego`) instead.
 
 Run: python scripts/bifrost_setup.py
 """
@@ -71,7 +73,7 @@ def main() -> None:
     _to_vault(values)
     print("\nPer-agent Bifrost virtual keys = the model-scope + budget + rate-limit layer.")
     print("Model least-privilege is also enforced in worker/pipeline/models_config.py.")
-    print("Send VKs on the inference hot path with RG_USE_BIFROST_VK=1 (see ADR-0007).")
+    print("Send VKs on the inference hot path with RG_USE_BIFROST_VK=1.")
 
 
 def _to_vault(values: dict[str, str]) -> None:

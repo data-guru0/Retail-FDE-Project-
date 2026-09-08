@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.models import Order, OrderItem, Product
+from app.ratelimit import limiter
 from app.schemas import CheckoutIn, OrderItemOut, OrderOut
 from app.security import Principal, current_user
 from app.services import mail
@@ -32,7 +33,9 @@ def _out(o: Order) -> OrderOut:
 
 
 @router.post("", response_model=OrderOut, status_code=201)
+@limiter.limit("60/minute")
 async def checkout(
+    request: Request,
     body: CheckoutIn,
     p: Principal = Depends(current_user),
     session: AsyncSession = Depends(get_session),

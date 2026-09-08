@@ -95,11 +95,28 @@ def main() -> None:
     c.ok("pipeline_start" in ev and "pipeline_end" in ev, f"live trace streamed ({len(ev)} events)")
     c.ok(ev.count("node_end") >= 7, f"per-node trace events present ({ev.count('node_end')} node_end)")
 
+    # agents reached tools through ContextForge — real call_tool events + audit rows
+    tcs = qall("select agent, payload->>'tool' t, payload->>'via' v, payload->>'ok' ok "
+               "from agent_run_events where return_id=%(r)s and kind='tool_call' order by seq",
+               r=rid)
+    tool_by_agent = {(a, t) for a, t, _, _ in tcs}
+    c.ok({("intake", "get_order"), ("policy", "check_policy"),
+          ("behavior", "get_customer_history"), ("behavior", "flag_ring")} <= tool_by_agent,
+         f"agents called their tools via ContextForge: {sorted(tool_by_agent)}")
+    c.ok(all(v == "contextforge" for _, _, v, _ in tcs), "every tool call routed through the gateway")
+    c.ok(tcs and all(ok == "true" for _, _, _, ok in tcs),
+         f"every ContextForge tool call returned real data (ok): {[(a, t, ok) for a, t, _, ok in tcs]}")
+    c.ok(q1("select count(*) from audit_log where entity_id=%(r)s and action='call_tool'", r=rid)
+         >= 4, "every call_tool wrote an audit_log row")
+
     gov_audit = q1(
         "select action from audit_log where entity_id=%(r)s and actor_id='governance_gate' "
         "order by id desc limit 1", r=rid)
     c.ok(gov_audit in ("auto_approve", "escalate"),
          f"GovernanceGate is the finalizer — audit_log action={gov_audit}")
+    c.ok(q1("select model from agent_runs where graph_run_id=%(g)s and agent='governance'", g=g)
+         == "governance_gate:opa",
+         "GovernanceGate decided via OPA (not the fail-closed fallback)")
 
     chain = subprocess.run([sys.executable, str(ROOT / "scripts" / "verify_audit_chain.py")],
                            capture_output=True, text=True)
@@ -112,6 +129,15 @@ def main() -> None:
 
     # ContextForge least-privilege (best-effort — only if configured)
     _check_contextforge(c)
+
+    # replay.py: re-run one node of this run in isolation (debugging tool, writes
+    # nothing to `returns`)
+    rp = subprocess.run(
+        ["docker", "compose", "exec", "-T", "worker", "python", "replay.py", g, "policy"],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    c.ok(rp.returncode == 0 and '"policy"' in rp.stdout,
+         f"replay.py re-ran the policy node in isolation (rc={rp.returncode})")
 
     c.done()
 
@@ -151,10 +177,25 @@ def _check_contextforge(c: Check) -> None:
     img_tools = tools_of(cfg["agents"]["image"]["server_id"])
     beh_tools = tools_of(cfg["agents"]["behavior"]["server_id"])
     c.ok("flag_ring" not in img_tools,
-         f"Image agent's virtual server has NO flag_ring (lists {img_tools})")
+         f"Image agent's virtual server lists NO flag_ring ({img_tools})")
     c.ok("flag_ring" in beh_tools,
-         f"Behavior agent's virtual server HAS flag_ring (lists {beh_tools})")
+         f"Behavior agent's virtual server lists flag_ring ({beh_tools})")
     c.ok(len(img_tools) == 0, "Image agent's virtual server exposes zero tools")
+
+    # the enforced check: the Image agent CANNOT call flag_ring (raises PermissionError)
+    grant = subprocess.run(
+        ["docker", "compose", "exec", "-T", "worker", "python", "-c",
+         "import json; from pipeline.mcp_client import is_granted as g; "
+         "print(json.dumps({'image_flag_ring': g('image','flag_ring'), "
+         "'behavior_flag_ring': g('behavior','flag_ring'), "
+         "'image_get_order': g('image','get_order')}))"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    gd = json.loads(grant.stdout.strip().splitlines()[-1]) if grant.stdout.strip() else {}
+    c.ok(gd.get("image_flag_ring") is False,
+         "Image agent is NOT granted flag_ring — a direct call raises PermissionError")
+    c.ok(gd.get("image_get_order") is False, "Image agent is granted no MCP tools at all")
+    c.ok(gd.get("behavior_flag_ring") is True, "Behavior agent IS granted flag_ring")
 
 
 if __name__ == "__main__":

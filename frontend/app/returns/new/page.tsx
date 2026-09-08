@@ -48,14 +48,25 @@ function Wizard() {
   }
 
   return (
-    <div style={{ maxWidth: 520, display: "flex", flexDirection: "column", gap: 12 }}>
+    <div
+      style={{
+        maxWidth: 520,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>Return: {itemName}</h1>
       <div className="muted">Step {step} of 3</div>
 
       {step === 1 && (
         <>
           <label>Why are you returning this?</label>
-          <select className="select" value={reason} onChange={(e) => setReason(e.target.value)}>
+          <select
+            className="select"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          >
             {REASONS.map((r) => (
               <option key={r} value={r}>
                 {r.replace(/_/g, " ")}

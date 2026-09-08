@@ -18,9 +18,14 @@ if [ -n "$NAME" ]; then
 fi
 
 echo "[backup] minio mirror"
-docker compose run --rm --entrypoint sh -T minio-init -c \
-  "mc alias set l http://minio:9000 \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD >/dev/null && mc mirror --overwrite l/returnguard /tmp/mirror" >/dev/null 2>&1 || true
-docker compose cp minio-init:/tmp/mirror "$OUT/minio" 2>/dev/null || \
-  echo "[backup] (minio mirror needs a persistent run target — see RUNBOOK)"
+# Mirror inside a named (not --rm) container, then `docker cp` it out and remove
+# it. Bind-mounting a host path into `compose run` is unreliable on Windows
+# Docker Desktop (drive-letter / space mangling), so we copy instead.
+CID="rg-backup-mc-$TS"
+docker compose run -T --name "$CID" --entrypoint sh minio-init -c \
+  "mc alias set l http://minio:9000 \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD >/dev/null && mc mirror --overwrite l/returnguard /tmp/mirror"
+docker cp "$CID:/tmp/mirror" "$OUT/minio"
+docker rm -f "$CID" >/dev/null
+echo "[backup] minio objects: $(find "$OUT/minio" -type f | wc -l)"
 
 echo "[backup] done -> $OUT"

@@ -30,13 +30,16 @@ def record_generation(
     *, agent: str, model: str, prompt: str, output: str,
     return_id: str, graph_run_id: str,
     tokens_in: int, tokens_out: int, cost: float,
+    langfuse_prompt=None,
 ) -> str | None:
     try:
+        kw = {"prompt": langfuse_prompt} if langfuse_prompt is not None else {}
         gen = lf().start_generation(
             name=agent,
             model=model,
             input=prompt,
             metadata={"return_id": return_id, "graph_run_id": graph_run_id},
+            **kw,
         )
         gen.update(
             output=output,

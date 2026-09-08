@@ -91,6 +91,7 @@ async def deep() -> dict:
         "vault": _check_vault(),
         "bifrost": _check_http("bifrost", f"{s.bifrost_url}/metrics"),
         "contextforge": _check_http("contextforge", f"{s.mcp_gateway_url}/health"),
+        "opa": _check_http("opa", f"{s.opa_url}/health"),
     }
     results: dict = {}
     for name, coro in checks.items():

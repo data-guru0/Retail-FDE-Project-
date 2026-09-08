@@ -1,4 +1,4 @@
-"""One-time AI-image-detector bake-off (ADR-0002).
+"""One-time AI-image-detector bake-off.
 
 Builds a small labeled sample:
   real/  — real product photos already in MinIO (seeded)
@@ -7,9 +7,9 @@ Builds a small labeled sample:
            AI images locally; see non-negotiable #5)
 
 Runs 2-3 candidate detectors over the sample and prints accuracy / the AI-class
-probability gap. The best performer is wired into the pipeline
-(pipeline/models_local.py, `RG_AI_DETECTOR`) and the numbers recorded in
-docs/decisions/ADR-0002.
+probability gap. The best performer (`haywoodsloan/ai-image-detector-deploy`,
+acc 0.92) is wired into the pipeline via `pipeline/models_local.py`
+(`RG_AI_DETECTOR`).
 
 Run: docker compose run --rm worker python -m ml.detector_bakeoff.run
 """

@@ -47,7 +47,13 @@ vault kv put secret/returnguard/langfuse \
   public_key="${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}" \
   secret_key="${LANGFUSE_INIT_PROJECT_SECRET_KEY}"
 
-vault kv put secret/returnguard/mcp gateway_url="http://mcp-gateway:4444"
+# preserve agent_servers if scripts/mcp_setup.py already wrote it (a re-run of
+# `make vault-init` must not wipe the ContextForge wiring)
+EXISTING_SERVERS=$(vault kv get -field=agent_servers secret/returnguard/mcp 2>/dev/null || echo '{}')
+vault kv put secret/returnguard/mcp \
+  gateway_url="http://mcp-gateway:4444" \
+  jwt_secret="${CONTEXTFORGE_JWT_SECRET}" \
+  agent_servers="${EXISTING_SERVERS}"
 
 # ---- per-service policy + AppRole -------------------------------------------
 for SVC in backend worker; do

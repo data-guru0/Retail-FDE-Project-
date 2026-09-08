@@ -14,6 +14,7 @@ volumes:
   vault_creds:
   clickhouse_data:
   langfuse_data:
+  hf_cache:        # CLIP + AI-image-detector weights — survive worker recreate/restart
 
 services:
   # ----------------------------------------------------------------- datastores
@@ -48,7 +49,7 @@ services:
       retries: 20
 
   qdrant:
-    image: qdrant/qdrant:v1.15.4
+    image: qdrant/qdrant:v1.19.0   # keep in lockstep with qdrant-client in */pyproject.toml
     volumes: [qdrant_data:/qdrant/storage]
     ports: ["6333:6333", "6334:6334"]
     networks: [rg]
@@ -156,6 +157,21 @@ services:
     ports: ["8090:8080"]
     networks: [rg]
 
+  # ----------------------------------------------------------------- policy engine
+  opa:
+    image: openpolicyagent/opa:1.20.1
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "/policies"]
+    volumes:
+      - ./infra/opa:/policies:ro
+    ports: ["8181:8181"]
+    networks: [rg]
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "--fail", "--data", "/policies",
+             "data.returnguard.authz.allow_tool"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   # ----------------------------------------------------------------- MCP
   mcp-server:
     build: ./mcp-server
@@ -260,6 +276,7 @@ services:
   backend:
     build: ./backend
     <<: *env
+    restart: unless-stopped
     environment:
       RG_ENV: docker
       VAULT_ADDR: http://vault:8200
@@ -269,6 +286,7 @@ services:
       redis: {condition: service_healthy}
       vault: {condition: service_healthy}
       vault-init: {condition: service_completed_successfully}
+      opa: {condition: service_healthy}
     volumes:
       - vault_creds:/vault-creds:ro
       - ./seed:/app/seed:ro
@@ -281,6 +299,7 @@ services:
   worker:
     build: ./worker
     <<: *env
+    restart: unless-stopped   # `make up` starts this before `make migrate`; recover once the schema lands
     environment:
       RG_ENV: docker
       VAULT_ADDR: http://vault:8200
@@ -291,8 +310,10 @@ services:
       vault: {condition: service_healthy}
       vault-init: {condition: service_completed_successfully}
       bifrost: {condition: service_started}
+      opa: {condition: service_healthy}
     volumes:
       - vault_creds:/vault-creds:ro
+      - hf_cache:/root/.cache/huggingface   # keep CLIP/detector weights across recreate
       - ./ml:/app/ml
       - ./docs:/app/docs
       - ./scenarios:/app/scenarios:ro

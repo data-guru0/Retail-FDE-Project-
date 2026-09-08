@@ -4,10 +4,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
+from app import telemetry
 from app.logging import configure, log
+from app.ratelimit import limiter
 from app.routers import health
-from app.telemetry import CorrelationMiddleware, metrics_response
 
 configure()
 
@@ -21,7 +25,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ReturnGuard API", version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(CorrelationMiddleware)
+# rate limiting (slowapi): a global default at the edge + stricter per-route
+# caps via @limiter.limit in the routers
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# correlation-id + Prometheus (+ /metrics), both via standard libs
+telemetry.setup(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -42,13 +54,6 @@ async def security_headers(request, call_next):
 
 app.include_router(health.router)
 
-
-@app.get("/metrics")
-def metrics():
-    return metrics_response()
-
-
-# Routers added in later milestones (shop, orders, returns, dashboard, ...).
 from app.routers import analytics, appeals, dashboard, orders, returns, shop, ws
 
 app.include_router(shop.router)

@@ -1,7 +1,8 @@
 import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 
-const ISSUER = process.env.KEYCLOAK_ISSUER ?? "http://localhost:8081/realms/returnguard";
+const ISSUER =
+  process.env.KEYCLOAK_ISSUER ?? "http://localhost:8081/realms/returnguard";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -27,7 +28,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessToken as string | undefined;
       try {
         const claims = JSON.parse(
-          Buffer.from((token.accessToken as string).split(".")[1], "base64").toString(),
+          Buffer.from(
+            (token.accessToken as string).split(".")[1],
+            "base64",
+          ).toString(),
         );
         (session.user as unknown as { roles: string[] }).roles =
           claims?.realm_access?.roles ?? [];

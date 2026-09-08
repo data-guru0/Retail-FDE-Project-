@@ -5,7 +5,12 @@ const config: NextConfig = {
     remotePatterns: [{ protocol: "http", hostname: "localhost", port: "9000" }],
   },
   async rewrites() {
-    return [{ source: "/api/backend/:path*", destination: "http://localhost:8000/:path*" }];
+    return [
+      {
+        source: "/api/backend/:path*",
+        destination: "http://localhost:8000/:path*",
+      },
+    ];
   },
 };
 

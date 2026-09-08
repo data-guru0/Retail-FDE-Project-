@@ -1,5 +1,5 @@
 """Thin LLM client: the OpenAI SDK pointed at Bifrost. No retry/fallback/circuit
-logic here — Bifrost owns all of that (ADR-0007). We pass the fallback list, the
+logic here — Bifrost owns all of that. We pass the fallback list, the
 per-agent Bifrost virtual key when one is configured, and — always — enforce the
 per-agent model-role grant (`models_config.assert_grant`) before the call.
 """
@@ -21,9 +21,9 @@ def _vk_for(agent: str | None) -> str | None:
 
     Only sent on the inference hot path when RG_USE_BIFROST_VK=1. Off by default:
     OSS Bifrost v2.0.0's virtual-key -> provider-credential binding needs a key
-    registration path that env/file provider keys don't satisfy locally
-    (ADR-0007). The per-agent **model** least-privilege is enforced regardless,
-    in models_config.assert_grant() above.
+    registration path that env/file provider keys don't satisfy locally. The
+    per-agent **model** least-privilege is enforced regardless, in
+    models_config.assert_grant() above.
     """
     if not agent or os.getenv("RG_USE_BIFROST_VK") != "1":
         return None

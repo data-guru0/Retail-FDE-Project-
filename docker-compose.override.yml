@@ -16,6 +16,7 @@ services:
       - ./scenarios:/app/scenarios:ro
       - ./docs:/app/docs
       - vault_creds:/vault-creds:ro
+      - hf_cache:/root/.cache/huggingface   # CLIP/detector weights persist across recreate
     ports: ["9100:9100"]
 
   mcp-server:

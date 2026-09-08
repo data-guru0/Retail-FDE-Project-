@@ -36,7 +36,12 @@ export function AnswerInfoRequest({
         onChange={(e) => setAnswer(e.target.value)}
         placeholder="Your answer…"
       />
-      <button className="btn" style={{ marginTop: 8 }} disabled={busy || !answer} onClick={send}>
+      <button
+        className="btn"
+        style={{ marginTop: 8 }}
+        disabled={busy || !answer}
+        onClick={send}
+      >
         {busy ? "Sending…" : "Send answer — this re-opens the review"}
       </button>
     </div>

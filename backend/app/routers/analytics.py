@@ -1,9 +1,14 @@
 """Analytics + agent health + auditor export — all from real rows.
-Baseline rates come from docs/BASELINE.md (parsed, not hardcoded here)."""
-from __future__ import annotations
 
-import pathlib
-import re
+The vs-all-human comparison uses the assumptions below. Only these five rates are
+assumptions; every count they multiply is a real row. Basis:
+  * $32/hr   — mid-market ops analyst, US, fully loaded (benefits + overhead)
+  * 7.5 min  — median all-human handling: read order + policy + photo, decide, log
+  * 4.0 min  — handling an escalated case when the agent already gathered evidence
+  * 1.5 min  — spot-checking an auto-approve QA sample
+  * $140     — mean refund in the synthetic fraud population (loss per miss)
+"""
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -15,23 +20,17 @@ from app.security import Principal, require_role
 router = APIRouter(prefix="/dashboard", tags=["analytics"])
 reviewer = require_role("reviewer", "admin")
 
-_BASELINE_MD = pathlib.Path(__file__).resolve().parents[1] / "docs" / "BASELINE.md"
+_BASELINE = {
+    "reviewer_cost_per_hour": 32.0,
+    "human_min_all": 7.5,
+    "human_min_escalated": 4.0,
+    "qa_min": 1.5,
+    "fraud_loss": 140.0,
+}
 
 
 def _baseline() -> dict:
-    txt = _BASELINE_MD.read_text() if _BASELINE_MD.exists() else ""
-
-    def num(label: str, default: float) -> float:
-        m = re.search(rf"{re.escape(label)}.*?\*\*\$?([\d.]+)", txt)
-        return float(m.group(1)) if m else default
-
-    return {
-        "reviewer_cost_per_hour": num("Reviewer fully-loaded cost", 32.0),
-        "human_min_all": num("Human handling time per return", 7.5),
-        "human_min_escalated": num("time per **escalated** case", 4.0),
-        "qa_min": num("confirm time for an auto-approve QA sample", 1.5),
-        "fraud_loss": num("Fraud loss per undetected", 140.0),
-    }
+    return dict(_BASELINE)
 
 
 @router.get("/analytics")

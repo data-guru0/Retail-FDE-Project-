@@ -53,12 +53,3 @@ async def product_image_bytes(return_id: str) -> bytes | None:
 async def return_photo_bytes(return_id: str) -> bytes | None:
     k = await _photo_key(return_id)
     return _get(k) if k else None
-
-
-async def return_photo_url(return_id: str) -> str | None:
-    k = await _photo_key(return_id)
-    if not k:
-        return None
-    return _s3("http://localhost:9000").generate_presigned_url(
-        "get_object", Params={"Bucket": get_settings().minio_bucket, "Key": k}, ExpiresIn=600
-    )

@@ -3,24 +3,30 @@ from __future__ import annotations
 
 import logging
 import re
-from contextvars import ContextVar
 
 import structlog
+from asgi_correlation_id.context import correlation_id
 
-correlation_id: ContextVar[str] = ContextVar("correlation_id", default="-")
-
-_SECRET_RE = re.compile(r"(sk-[A-Za-z0-9_\-]{12,}|gsk_[A-Za-z0-9]{20,}|Bearer\s+[A-Za-z0-9._\-]+)")
+# Redact by value pattern (API-key / bearer shapes) AND by key name (anything that
+# looks like a credential field) so a stray secret can't ride out in a log line.
+_SECRET_RE = re.compile(
+    r"(sk-[A-Za-z0-9_\-]{12,}|gsk_[A-Za-z0-9]{20,}|Bearer\s+[A-Za-z0-9._\-]+"
+    r"|postgres(?:ql)?://[^\s\"']*:[^\s\"'@]+@)"
+)
+_SECRET_KEYS = re.compile(r"(pass(word)?|secret|token|api[_-]?key|authorization|credential)", re.I)
 
 
 def _redact(_, __, event_dict: dict) -> dict:
     for k, v in list(event_dict.items()):
-        if isinstance(v, str):
+        if _SECRET_KEYS.search(k):
+            event_dict[k] = "«redacted»"
+        elif isinstance(v, str):
             event_dict[k] = _SECRET_RE.sub("«redacted»", v)
     return event_dict
 
 
 def _add_correlation(_, __, event_dict: dict) -> dict:
-    event_dict.setdefault("correlation_id", correlation_id.get())
+    event_dict.setdefault("correlation_id", correlation_id.get() or "-")
     return event_dict
 
 

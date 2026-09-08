@@ -18,7 +18,6 @@ from _rg import Check, httpx
 
 ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
-DEMO = (ROOT / "docs" / "DEMO.md").read_text(encoding="utf-8")
 MAKEFILE = (ROOT / "Makefile").read_text(encoding="utf-8")
 
 
@@ -52,12 +51,19 @@ def main() -> None:
               "loadtest.py", "preflight.sh"]:
         c.ok((ROOT / "scripts" / s).exists(), f"scripts/{s} exists")
 
-    # all 9 ADRs + the docs set
-    adrs = list((ROOT / "docs" / "decisions").glob("ADR-*.md"))
-    c.ok(len(adrs) >= 9, f"{len(adrs)} ADRs present")
-    for d in ["ARCHITECTURE", "GOVERNANCE", "SECURITY", "RUNBOOK", "OPERATING_MODEL",
-              "FAIRNESS", "BASELINE", "SCENARIOS", "MODEL_CARD", "DEMO"]:
-        c.ok((ROOT / "docs" / f"{d}.md").exists(), f"docs/{d}.md exists")
+    # docs/ is the scenario catalog + its index; architecture / ops / security
+    # live in README now
+    c.ok((ROOT / "docs" / "SCENARIOS.md").exists(), "docs/SCENARIOS.md (the index) exists")
+    for section in ["## Operations", "## Security notes", "### How a return flows"]:
+        c.ok(section in README, f"README has the '{section.strip('# ')}' section")
+
+    # the step-by-step scenario walkthroughs
+    walkthroughs = sorted((ROOT / "docs" / "scenarios").glob("[0-9][0-9]-*.md"))
+    c.ok(len(walkthroughs) >= 12, f"{len(walkthroughs)} docs/scenarios/*.md walkthroughs")
+    for w in walkthroughs:
+        body = w.read_text(encoding="utf-8")
+        c.ok("## Run it" in body and "## What happens, step by step" in body,
+             f"{w.name}: has Run-it + step-by-step sections")
 
     # the [demo] scenarios run for real
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "run_scenarios.py"), "--demo"],

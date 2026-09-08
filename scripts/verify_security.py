@@ -119,19 +119,52 @@ def main() -> None:
         c.ok("flag_ring" not in tools and len(tools) == 0,
              f"Image agent still has zero tools under an injection attempt ({tools})")
 
-    # per-agent model least-privilege (models_config.is_granted / assert_grant)
+    # per-agent least privilege — enforced in code, not just ContextForge list-filtering
     grant = subprocess.run(
         ["docker", "compose", "exec", "-T", "worker", "python", "-c",
-         "import json; from pipeline.models_config import is_granted as g; "
-         "print(json.dumps({'image_reason': g('image','reason'), "
-         "'image_vision': g('image','vision'), 'expl_reason': g('explanation','reason')}))"],
+         "import json\n"
+         "from pipeline.models_config import is_granted as m\n"
+         "from pipeline.mcp_client import is_granted as t\n"
+         "print(json.dumps({"
+         "'image_model_reason': m('image','reason'), 'image_model_vision': m('image','vision'), "
+         "'expl_model_reason': m('explanation','reason'), "
+         "'image_tool_flag_ring': t('image','flag_ring'), "
+         "'image_tool_get_order': t('image','get_order'), "
+         "'behavior_tool_flag_ring': t('behavior','flag_ring')}))"],
         cwd=ROOT, capture_output=True, text=True,
     )
     gd = json.loads(grant.stdout.strip().splitlines()[-1]) if grant.stdout.strip() else {}
-    c.ok(gd.get("image_reason") is False,
+    c.ok(gd.get("image_model_reason") is False,
          "Image agent is NOT granted the 'reason' model role (blocked before the call)")
-    c.ok(gd.get("image_vision") is True, "Image agent IS granted 'vision'")
-    c.ok(gd.get("expl_reason") is False, "Explanation agent is NOT granted 'reason' (only 'deep')")
+    c.ok(gd.get("image_model_vision") is True, "Image agent IS granted 'vision'")
+    c.ok(gd.get("expl_model_reason") is False, "Explanation agent is NOT granted 'reason'")
+    c.ok(gd.get("image_tool_flag_ring") is False and gd.get("image_tool_get_order") is False,
+         "Image agent cannot call ANY MCP tool — mcp_client.call raises PermissionError")
+    c.ok(gd.get("behavior_tool_flag_ring") is True, "Behavior agent CAN call flag_ring")
+
+    # the grant decision is OPA's — query the policy engine directly
+    def _opa(path: str, inp: dict):
+        return httpx.post(f"http://localhost:8181/v1/data/returnguard/{path}",
+                          json={"input": inp}, timeout=5).json().get("result")
+
+    c.ok(_opa("authz/allow_tool", {"agent": "image", "tool": "flag_ring"}) is False,
+         "OPA denies Image agent the flag_ring tool")
+    c.ok(_opa("authz/allow_tool", {"agent": "behavior", "tool": "flag_ring"}) is True,
+         "OPA allows Behavior agent the flag_ring tool")
+    c.ok(_opa("authz/allow_model", {"agent": "image", "role": "reason"}) is False,
+         "OPA denies Image agent the 'reason' model role")
+    kill = _opa("governance/decision", {
+        "kill_switch": True, "dq_ok": True, "dq_reason": "", "proposed": "approve",
+        "high_value": False, "critic_veto": False, "critic_concern": "",
+        "risk": 0.0, "confidence": 1.0, "tau_risk": 0.3, "tau_conf": 0.8,
+        "automation_level": "auto"})
+    c.ok(kill and kill.get("route") == "escalate",
+         "OPA governance policy: kill switch forces escalate even on a perfect case")
+
+    # the policy bundle's own unit tests
+    opat = subprocess.run(["docker", "compose", "exec", "-T", "opa", "/opa", "test", "/policies"],
+                          cwd=ROOT, capture_output=True, text=True)
+    c.ok(opat.returncode == 0, f"OPA policy unit tests pass ({opat.stdout.strip().splitlines()[-1] if opat.stdout.strip() else opat.stderr[:120]})")
 
     # no money-mutating tool
     tools_src = (ROOT / "mcp-server" / "tools.py").read_text().lower()
@@ -142,6 +175,21 @@ def main() -> None:
     c.ok(subprocess.run([sys.executable, str(ROOT / "scripts" / "verify_audit_chain.py")],
                         capture_output=True).returncode == 0,
          "audit chain still validates")
+
+    # slowapi rate limiting is actually wired (middleware in the stack + a 429
+    # handler + per-route caps), not just a dep
+    rl = subprocess.run(
+        ["docker", "compose", "exec", "-T", "backend", "python", "-c",
+         "import json; from app.main import app; from slowapi.errors import RateLimitExceeded; "
+         "mw=[m.cls.__name__ for m in app.user_middleware]; "
+         "print(json.dumps({'has_mw': 'SlowAPIMiddleware' in mw, "
+         "'has_limiter': hasattr(app.state,'limiter'), "
+         "'has_429_handler': RateLimitExceeded in app.exception_handlers}))"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    rd = json.loads(rl.stdout.strip().splitlines()[-1]) if rl.stdout.strip() else {}
+    c.ok(rd.get("has_mw") and rd.get("has_limiter") and rd.get("has_429_handler"),
+         f"slowapi rate limiting is wired (middleware + limiter + 429 handler): {rd}")
 
     with db() as x:
         x.execute("update feature_flags set automation_level='shadow' where scope='global'")

@@ -19,9 +19,16 @@ export default async function ReturnsPage() {
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>My returns</h1>
       {rows.length === 0 && <p className="muted">No returns yet.</p>}
       {rows.map((r) => (
-        <Link key={r.id} href={`/returns/${r.id}`} className="card" style={{ padding: 14 }}>
+        <Link
+          key={r.id}
+          href={`/returns/${r.id}`}
+          className="card"
+          style={{ padding: 14 }}
+        >
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>#{r.id.slice(0, 8)} · {r.reason_code}</span>
+            <span>
+              #{r.id.slice(0, 8)} · {r.reason_code}
+            </span>
             <span>
               {r.status}
               {r.refund_state !== "none" ? ` · ${r.refund_state}` : ""}

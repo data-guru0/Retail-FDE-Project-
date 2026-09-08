@@ -87,6 +87,15 @@ def main() -> None:
         print("  restoring the worker…")
         OVERRIDE.unlink(missing_ok=True)
         compose("up", "-d", "--force-recreate", "worker")
+        # WAIT until the restored worker is up AND fault injection is really gone —
+        # otherwise the dying poisoned container grabs jobs from the next check.
+        for _ in range(40):
+            time.sleep(2)
+            p = compose("exec", "-T", "worker", "printenv", "RG_PIPELINE_FORCE_ERROR")
+            if p.returncode != 0 or not (p.stdout or "").strip():
+                break
+        else:
+            print("  WARNING: worker still shows RG_PIPELINE_FORCE_ERROR after restore")
 
     c.done()
 

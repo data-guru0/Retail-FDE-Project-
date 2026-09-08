@@ -56,6 +56,12 @@ def submit_return() -> tuple[str, dict, str]:
 
 def main() -> None:
     c = Check("verify_m3")
+    # this check is about *shadow* behaviour — make sure that's the level,
+    # regardless of what a previous scenario left behind
+    from _rg import db
+    with db() as x:
+        x.execute("update feature_flags set automation_level='shadow', kill_switch=false "
+                  "where scope='global'")
     rid, h, _ = submit_return()
     print(f"  submitted return {rid}; waiting for the worker…")
 

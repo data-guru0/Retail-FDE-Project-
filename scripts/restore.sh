@@ -17,6 +17,18 @@ if [ -f "$DIR/qdrant-policy_docs.snapshot" ]; then
     echo "[restore] qdrant upload failed — re-run: make reembed-policy"
 fi
 
+if [ -d "$DIR/minio" ]; then
+  echo "[restore] minio objects from $DIR/minio"
+  # docker cp into a short-lived named mc container, then mirror back to the
+  # bucket (the mc image has no tar, and Windows bind-mounts are unreliable).
+  CID="rg-restore-mc-$(date +%s)"
+  docker compose run -d --name "$CID" --entrypoint sleep minio-init 300 >/dev/null
+  docker cp "$DIR/minio/." "$CID:/tmp/m"
+  docker exec "$CID" sh -c \
+    "mc alias set l http://minio:9000 \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD >/dev/null && mc mirror --overwrite /tmp/m l/returnguard"
+  docker rm -f "$CID" >/dev/null
+fi
+
 echo "[restore] restart app"
 docker compose restart backend worker
 echo "[restore] done"

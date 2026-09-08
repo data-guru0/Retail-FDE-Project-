@@ -37,7 +37,10 @@ export function PolicyEditor({ docs }: { docs: Doc[] }) {
             className="input"
             value={edits[d.slug].title}
             onChange={(e) =>
-              setEdits({ ...edits, [d.slug]: { ...edits[d.slug], title: e.target.value } })
+              setEdits({
+                ...edits,
+                [d.slug]: { ...edits[d.slug], title: e.target.value },
+              })
             }
           />
           <textarea
@@ -46,7 +49,10 @@ export function PolicyEditor({ docs }: { docs: Doc[] }) {
             style={{ marginTop: 8 }}
             value={edits[d.slug].body}
             onChange={(e) =>
-              setEdits({ ...edits, [d.slug]: { ...edits[d.slug], body: e.target.value } })
+              setEdits({
+                ...edits,
+                [d.slug]: { ...edits[d.slug], body: e.target.value },
+              })
             }
           />
         </div>

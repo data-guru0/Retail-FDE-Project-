@@ -105,68 +105,320 @@ the chain and fails on any tamper.
 
 | Layer | Tech |
 |---|---|
-| Shop + dashboard | Next.js 16 (App Router), Auth.js + Keycloak (OIDC + PKCE) |
-| API + WebSocket | FastAPI (Python 3.13, Docker), SQLAlchemy 2 async, Alembic |
+| Shop + dashboard | Next.js 16 (App Router), Auth.js + Keycloak (OIDC + PKCE); API types generated from the backend's OpenAPI schema (`openapi-typescript` + `openapi-fetch`) |
+| API + WebSocket | FastAPI (Python 3.13, Docker), SQLAlchemy 2 async, Alembic; `slowapi` rate limiting, `asgi-correlation-id` + `prometheus-fastapi-instrumentator` |
 | Worker | `arq` on Redis; **LangGraph** pipeline with a Postgres checkpointer |
 | LLM gateway | **Bifrost** — one endpoint for Groq + OpenAI, fallback chains, per-agent virtual keys, cost/latency telemetry |
 | MCP governance | **IBM ContextForge** in front of a plain MCP tools server — one virtual server per agent, exposing only that agent's tools |
+| Policy engine | **OPA** (Open Policy Agent) — the auto-approve/escalate decision *and* every per-agent tool/model grant are `.rego` policy in `infra/opa/`, not app code |
 | Vector store | Qdrant (return-policy RAG) |
-| Local ML | scikit-learn risk model; open-clip CLIP; an AI-image detector — all CPU |
-| Observability | **Langfuse v3** (self-hosted, shares Postgres/Redis/MinIO, + ClickHouse) |
+| Local ML | scikit-learn risk model; open-clip CLIP; an AI-image detector — all CPU. The trained model's card is written to `ml/registry/<version>/MODEL_CARD.md` by `make train` |
+| Observability | **Langfuse v3** (self-hosted, shares Postgres/Redis/MinIO, + ClickHouse) — traces every agent call *and* holds the versioned, trace-linked agent prompts |
 | Identity | Keycloak — `customer` / `reviewer` / `admin`, plus one service account per agent |
 | Storage / email / secrets | MinIO / MailHog / **HashiCorp Vault** (every runtime secret) |
 
-Architecture detail: `docs/ARCHITECTURE.md`. Every real design choice has an ADR
-in `docs/decisions/`.
+### How a return flows through it
+
+```
+Customer (browser)
+  └─ Next.js (host) ── Auth.js/Keycloak OIDC+PKCE ──► Keycloak
+        │  server-side token proxy (/api/rg/*)  — the token never reaches the browser
+        ▼
+     FastAPI backend (Docker) — verifies the Keycloak JWT (JWKS) on every request
+        ├─ submit return  ─►  returns + return_photos + outbox  (one transaction)
+        │                     + best-effort arq enqueue
+        └─ WebSocket /ws/returns/{id}  ◄── Redis pub/sub  rg:events:{id}
+
+Worker (Docker, arq on Redis)
+  ├─ dispatch_outbox cron — durability backstop (no review job is ever lost)
+  └─ review_return
+        └─ LangGraph pipeline (Postgres checkpointer, schema `langgraph`)
+             data_quality → planner → intake → policy(RAG) → [image] → behavior
+                → decision → critic → explanation → GovernanceGate
+             every node: an agent_runs row + agent_run_events (+ Redis publish)
+                         + a Langfuse generation
+             each LLM call ─► Bifrost ─► Groq / OpenAI   (per-agent virtual key)
+             tool calls    ─► ContextForge ─► mcp-server ─► Postgres
+             allow/deny    ─► OPA (asked before every tool call, model call, and
+                              at the gate; fails closed)
+             GovernanceGate — the only finalizer → returns + hash-chained audit_log
+```
+
+**Trust boundaries:** browser → Next.js (session cookie only, no token);
+Next.js → backend (Keycloak JWT, JWKS-verified per request); backend/worker →
+Vault (AppRole, dev-token fallback); agent → tools (OPA `allow_tool` /
+`allow_model` on the hot path, mirrored by Keycloak SA ↔ ContextForge virtual
+server ↔ Bifrost virtual key); refunds are **human-only** — no MCP tool mutates
+payment state; auto-approve vs escalate is **OPA policy**, not app code.
+
+**Postgres** also hosts separate logical DBs for Langfuse / Bifrost / the MCP
+gateway and a `keycloak` schema. `pgvector` is deliberately unused (Qdrant is
+the vector store).
 
 ---
 
 ## Run it from a clean checkout
 
-**Prerequisites:** Docker Desktop (running), Node 24+, Python 3.11+ on the host,
-`make`. ~9 GB RAM free for the full stack.
+This is written for someone starting with **an empty machine**. Do the steps in
+order, top to bottom. Every step says what the command does and how to tell it
+worked. First run is ~15–20 min wall-clock, almost all of it Docker downloading
+and building images. You need ~9 GB of free RAM while the stack is up.
 
-```bash
-pip install -r scripts/requirements.txt   # host deps for the verify/setup scripts
+### Step 0 — install the four prerequisites
+
+You need Git, Docker Desktop, Node.js 20+ (24 recommended), and Python 3.11+.
+Pick your OS.
+
+**Windows 11**
+
+```powershell
+# run in PowerShell; installs all four via winget
+winget install --id Git.Git -e
+winget install --id Docker.DockerDesktop -e
+winget install --id OpenJS.NodeJS.LTS -e
+winget install --id Python.Python.3.12 -e
 ```
 
+Then **launch Docker Desktop once** and wait for it to say "Engine running".
+Use **Git Bash** (installed with Git) for every `make` command below — `make`
+ships with it.
+
+**macOS**
+
 ```bash
-# 1. secrets — copy the template and fill in the two API keys + any strong
-#    random strings for the generated-credential fields
-cp .env.example .env
-#    edit .env: set OPENAI_API_KEY, GROQ_API_KEY, and the POSTGRES_PASSWORD /
-#    MINIO_ROOT_PASSWORD / KEYCLOAK_ADMIN_PASSWORD / LANGFUSE_* / NEXTAUTH_SECRET
-#    / CONTEXTFORGE_JWT_SECRET / BIFROST_ADMIN_TOKEN fields to random values.
+brew install git node python@3.12
+brew install --cask docker      # then open Docker.app once and wait for it to start
+# `make` comes with the Xcode command-line tools: xcode-select --install
+```
 
-# 2. bring up the whole stack (Postgres, Redis, Qdrant, MinIO, MailHog, Vault,
-#    Keycloak, Bifrost, ContextForge, mcp-server, Langfuse + ClickHouse,
-#    backend, worker). First run pulls images + builds — several minutes.
+**Debian / Ubuntu**
+
+```bash
+sudo apt update && sudo apt install -y git make python3 python3-pip curl
+# Docker Engine + compose plugin:
+curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker "$USER"   # log out/in after
+# Node 24 via nvm:
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+. ~/.nvmrc 2>/dev/null; nvm install 24
+```
+
+**Verify all four before continuing** — each must print a version:
+
+```bash
+git --version                 # any recent
+docker compose version        # any v2+ (the `docker compose` subcommand, not the old `docker-compose`)
+node --version                # v20+ (v24 is what this was built on)
+python --version              # 3.11+ on the host — only runs the setup/verify scripts;
+                              # the app itself runs on 3.13 inside Docker
+```
+
+### Step 1 — get the code
+
+```bash
+git clone https://github.com/<your-user>/returnguard.git
+cd returnguard
+```
+
+Everything from here runs **from this `returnguard/` folder** unless a step says
+"in the `frontend/` folder".
+
+### Step 2 — install the host-side Python packages
+
+These are only for the setup + verification scripts (`httpx`, `psycopg`,
+`websockets`, `PyJWT`). The app itself runs in Docker and needs nothing from your
+host Python.
+
+```bash
+python -m pip install -r scripts/requirements.txt
+```
+
+*Worked if:* `pip` finishes with no red errors. (Optional: make a venv first —
+`python -m venv .venv && . .venv/bin/activate` — then run the line above.)
+
+### Step 3 — generate all the secrets
+
+```bash
+python scripts/gen_secrets.py
+```
+
+This writes **`.env`** and **`frontend/.env.local`** with fresh random values for
+every generated credential (Postgres, MinIO, Keycloak admin, Langfuse, Bifrost,
+ContextForge, Auth.js). It is safe to re-run — it only fills blanks, never
+rotates a value that's already set.
+
+*Worked if:* it prints `.env : 11 generated, …` and then lists **only**
+`OPENAI_API_KEY` and `GROQ_API_KEY` as still blank.
+
+### Step 4 — add your two paid API keys
+
+Open **`.env`** in an editor and fill these two lines:
+
+```
+OPENAI_API_KEY=sk-...        # from https://platform.openai.com/api-keys
+GROQ_API_KEY=gsk_...         # from https://console.groq.com/keys
+```
+
+Nothing else in `.env` needs touching. These are the only things that cost money;
+budget a few US cents for a full `smoke.py` run.
+
+### Step 5 — bring up the whole stack
+
+```bash
 make up
+```
 
-# 3. database schema + seed data (29 real products + return-policy docs)
+Builds + starts ~18 containers: Postgres, Redis, Qdrant, MinIO, MailHog, Vault,
+Keycloak, Bifrost, ContextForge, the MCP tools server, OPA, Langfuse + its worker
++ ClickHouse, Prometheus, Grafana, the FastAPI backend, and the arq worker. It
+runs a preflight check first (Docker running? ports free?) then blocks until
+every container is healthy. (`make up-lite` skips Prometheus + Grafana.)
+
+*Worked if:* the command ends with `all services healthy`. If it complains a port
+is in use, stop whatever owns it (common: a local Postgres on 5432) and re-run.
+
+### Step 6 — create the database schema
+
+```bash
 make migrate
+```
+
+Runs the Alembic migrations inside the backend container (this project never uses
+`create_all` — every table is a real, ordered migration).
+
+*Worked if:* the last line is an Alembic `Running upgrade … -> …, <name>` ending
+at the current head with no traceback.
+
+### Step 7 — load the seed data
+
+```bash
 make seed
+```
 
-# 4. one-time M4 setup: synthetic dataset, train + register the risk model,
-#    embed the policy docs into Qdrant
+Inserts 29 real products (with images pushed to MinIO) and the versioned
+return-policy documents the Policy agent will search.
+
+*Worked if:* it prints a count of products + policy docs written and exits 0.
+Check: open http://localhost:3000 — the shop shows a product grid.
+
+### Step 8 — one-time AI setup
+
+```bash
 make m4-setup
+```
 
-# 5. gateways: ContextForge per-agent tool servers + Bifrost per-agent model keys
-#    (also run by `make m4-setup` above)
-python scripts/mcp_setup.py
-python scripts/bifrost_setup.py
+Runs six things in order, then restarts the worker to pick them all up:
+generate the synthetic fraud dataset → train + register the scikit-learn risk
+model → embed the policy docs into Qdrant → create one **ContextForge virtual
+server per agent** (tool allow-list) → create one **Bifrost virtual key per
+agent** (model allow-list + budget) → push the agent prompts to **Langfuse**
+(versioned, UI-editable). ~2–3 min.
 
-# 6. frontend (runs on the host, not in Docker)
-cd frontend && npm install && npm run dev      # http://localhost:3000
+*Worked if:* it ends with `setup complete (dataset + model + policy index +
+ContextForge + Bifrost VKs + prompts)`, with `pushed -> lf v1` for each of the
+7 agent prompts just above it.
 
-# 7. prove it works
+### Step 9 — start the shop + dashboard
+
+The frontend runs on your host (not in Docker). It stays in the foreground, so
+give it its own terminal.
+
+```bash
+cd frontend
+npm install          # first time only, ~1 min
+npm run dev
+```
+
+*Worked if:* it prints `Ready` / `Local: http://localhost:3000` and that page
+loads. Leave this terminal running.
+
+### Step 10 — prove it all works
+
+Open a **second terminal**, back in the `returnguard/` folder:
+
+```bash
 python scripts/smoke.py
 ```
 
-Seeded logins (Keycloak): `reviewer1@returnguard.local` / `reviewer1`,
-`admin1@returnguard.local` / `admin1`. Customers self-register in the shop.
+Runs every `verify_*` script and the scenario catalog against the live system —
+it registers test customers, places real orders, submits real returns, drives the
+full multi-agent pipeline, and checks the results against real Postgres / MinIO /
+Langfuse / audit-chain state. ~8–10 min.
 
-Verify from nothing: `make nuke` (deletes volumes) then repeat from step 2.
+*Worked if:* the final `SMOKE SUMMARY` block is all `PASS` and the process exits
+0. Now walk the [scenario catalog](docs/SCENARIOS.md) — each file in
+`docs/scenarios/` is a guided tour of one behaviour.
+
+---
+
+### Logins, reset, and daily use
+
+- **Dashboard logins** (Keycloak): `reviewer1@returnguard.local` / `reviewer1`
+  and `admin1@returnguard.local` / `admin1`. Customers self-register at checkout.
+- **Start completely over:** `make nuke` (deletes every volume), then re-run from
+  Step 5.
+- **Day to day:** `make down` stops the stack keeping data · `make up` brings it
+  back · `make logs` tails everything · `make scenarios` re-runs the behaviour
+  catalog · `make smoke` re-runs all verification.
+
+---
+
+## Every command, explained
+
+`make` is the only entrypoint — one target per operation. Run `make help` for the
+same list. `a="…"` passes arguments to a target; `m="…"` passes a message.
+
+### Setup / lifecycle
+
+| Command | What it does |
+|---|---|
+| `python scripts/gen_secrets.py` | Fill `.env` + `frontend/.env.local` with fresh random credentials. Idempotent — never rotates a value that is already set. |
+| `make preflight` | Check Docker is running, the required ports are free, and there is enough disk. `make up` runs it first. |
+| `make up` | Build images and start the whole stack (18 containers **incl.** Prometheus + Grafana), then block until every container is healthy. |
+| `make up-lite` | Same as `make up` but skips the `observability` profile (no Prometheus/Grafana) — lighter on RAM. |
+| `make migrate` | Apply the Alembic migrations inside the backend container. This project never uses `create_all`. |
+| `make makemigration m="msg"` | Autogenerate a new Alembic migration from model changes. |
+| `make seed` | Insert the 29 real products (photos pushed to MinIO) and the versioned return-policy documents. |
+| `make m4-setup` | One-time AI wiring: `dataset` → `train` → `reembed-policy` → `mcp-setup` → `bifrost-setup` → `sync-prompts`, then restart the worker. |
+| `make vault-init` | Re-run the Vault bootstrap (KV v2, per-service policies + AppRoles, load keys). |
+| `make down` | Stop every container. Keeps all named volumes (data survives). |
+| `make nuke` | Stop every container **and delete all volumes** — a completely clean slate. Re-run from `make up`. |
+| `make logs` | Tail the logs of every container. |
+
+### AI setup pieces (all rolled up by `make m4-setup`)
+
+| Command | What it does |
+|---|---|
+| `make dataset` | Generate the synthetic fraud dataset (thousands of rows, injected rings + cohorts). |
+| `make train` | Train + register the scikit-learn behaviour risk model; writes the model, its card, and metrics to `ml/registry/<version>/`. |
+| `make reembed-policy` | Embed the active policy docs into the Qdrant vector collection (re-run after a policy edit). |
+| `make mcp-setup` | Configure ContextForge: register the tools gateway and one per-agent virtual server (tool allow-list) each. |
+| `make bifrost-setup` | Register one per-agent Bifrost virtual key (model allow-list + monthly budget + rate limit). |
+| `make sync-prompts` | Push `worker/pipeline/prompts/*.md` to Langfuse as versioned, UI-editable prompts. |
+
+### Verify / test
+
+| Command | What it does |
+|---|---|
+| `make smoke` | Run every `scripts/verify_*.py` **and** the scenario catalog against the live system, in sequence. The full proof. ~10 min. |
+| `make scenarios` | Run just the automatable scenario catalog (`scripts/run_scenarios.py`). |
+| `make demo` | Seed, then run the audience-subset `[demo]` scenarios (A0, A2, A5). |
+| `make opa-test` | Run the OPA policy unit tests (`infra/opa/*_test.rego`). |
+| `python scripts/verify_m1.py` … `verify_m6.py` | Individual milestone checks — stack health, shop+auth, single-agent pipe, full agent graph, reviewer workflow, docs. Run one directly instead of the whole `smoke`. |
+| `python scripts/verify_audit_chain.py` | Re-walk the hash-chained `audit_log` and fail on any tamper. |
+| `python scripts/verify_security.py` | Fire prompt-injection payloads with autonomy forced on; assert no privilege escalation, no auto-approve, a real decision row, a truthful audit entry. |
+| `python scripts/run_scenarios.py [A0 A5 …]` | Run all automatable scenarios, or only the ones you name. `--demo` = the `[demo]` subset. |
+| `python scripts/loadtest.py` (`make loadtest`) | Push ~20× normal return volume through the queue and report p95; asserts no lost jobs. |
+
+### Operate / debug
+
+| Command | What it does |
+|---|---|
+| `make replay a="<graph_run_id> <node>"` | Re-run **one** pipeline node for a past graph run in isolation, to debug it. |
+| `make reprocess a="--since <date> --until <date> --policy-version <v>"` | Batch re-review a window of still-open returns (add `--dry-run` to preview). |
+| `make backup` | Write `backups/<timestamp>/` — `pg_dump` + a Qdrant snapshot + a MinIO mirror. |
+| `make restore` / `bash scripts/restore.sh backups/<timestamp>` | Restore Postgres + Qdrant + MinIO from a backup directory. |
+| `cd frontend && npm run dev` | Start the Next.js shop + dashboard on the host (`http://localhost:3000`). Runs in the foreground. |
+| `cd frontend && npm run gen:api` | Regenerate `frontend/lib/api/schema.ts` from the backend's OpenAPI schema (after an API shape change). |
 
 ---
 
@@ -181,41 +433,111 @@ Verify from nothing: `make nuke` (deletes volumes) then repeat from step 2.
 | http://localhost:6333/dashboard | Qdrant — the policy-doc vector collection |
 | http://localhost:8090 | Bifrost — LLM gateway dashboard + `/metrics` |
 | http://localhost:4444 | ContextForge — MCP gateway (JWT-gated API) |
+| http://localhost:8181 | OPA — policy engine (`/v1/data/returnguard/...`) |
 | http://localhost:9001 | MinIO console — return photos + product images |
 | http://localhost:8025 | MailHog — order / return / decision emails |
 | http://localhost:8200 | Vault (dev token: `root`) |
-| http://localhost:9090 / :3002 | Prometheus / Grafana (with `--profile observability`) |
+| http://localhost:9090 | Prometheus — backend + worker metrics |
+| http://localhost:3002 | Grafana — provisioned agent-health dashboards (anon access on) |
+
+---
+
+## Operations
+
+**Kill switch (stop autonomy now, no deploy).** Dashboard → Governance → tick
+**kill switch** on the `global` row → Save (or `PUT /dashboard/governance
+{"scope":"global","kill_switch":true}` as an admin). Effect is immediate — the
+Governance Gate reads `feature_flags` per run, so the next case and every case
+after routes to a human regardless of level. Untick to resume; consider dropping
+`automation_level` to `shadow` while you investigate.
+
+**Escalation backlog.** Bulk-claim + decide from the dashboard Queue. If the
+backlog is *pipeline* throughput rather than *human* throughput, add workers:
+`docker compose up -d --scale worker=3` — arq is a shared Redis queue, replicas
+cooperate, and the atomic claim in `review_return` prevents double-processing.
+
+**Dead-letter.** A `dead_letter` row means a case crashed 3× — it was
+auto-escalated (a human will see it) but the root cause needs a look. Inspect
+`select * from dead_letter order by created_at desc;` and the matching
+`agent_run_events` (kind `error`). Re-run one case: `make replay a="<graph_run_id>
+<node>"` to debug a node, or `update returns set status='pending',
+review_attempts=0 where id='…';` (the `dispatch_outbox` cron re-enqueues it).
+
+**Policy change.** Dashboard → Policy → edit → Save writes a new `policy_docs`
+version and enqueues a Qdrant re-embed. New cases pick it up automatically;
+`agent_runs.policy_version` records which applied. Re-review still-pending cases
+under the old policy: `make reprocess a="--since <date> --policy-version <new>"`.
+
+**Key rotation.** `docker compose exec vault vault kv patch
+secret/returnguard/llm openai_api_key=sk-…` (or `groq_api_key=…`), then
+`docker compose restart backend worker` (settings are cached per process). For
+generated DB / MinIO / Keycloak creds, edit `.env` and `make nuke` is the clean
+path.
+
+**Backup / restore.** `make backup` → `backups/<timestamp>/` (pg_dump + Qdrant
+snapshot + MinIO mirror). `bash scripts/restore.sh backups/<timestamp>` restores.
+
+## Security notes
+
+- **Auth** — Auth.js + Keycloak (Auth Code + PKCE), token exchanged server-side
+  only. FastAPI verifies the Keycloak JWT (JWKS) on every request; roles from
+  `realm_access.roles`.
+- **Per-agent identity + least privilege** — one Keycloak service account per
+  agent ↔ a ContextForge virtual server exposing only that agent's tools ↔ a
+  Bifrost virtual key capping models + spend; OPA (`infra/opa/authz.rego`) is
+  asked before every tool/model call and fails closed. The Image agent is
+  granted **zero** tools.
+- **Uploads** — magic-byte sniff (`filetype`), 8 MB cap, Pillow re-encode to
+  strip EXIF / trailing payload, per-object MinIO key, presigned GET only.
+- **Rate limiting** — `slowapi`: a global per-IP cap at the edge plus stricter
+  per-route caps on `POST /orders` and `POST /returns`.
+- **Prompt injection** — customer free-text (and text baked into an uploaded
+  image) is data, not instructions; no prompt can move `automation_level`, the
+  thresholds, or the "auto-deny is impossible" rule. `scripts/verify_security.py`
+  fires a blatant payload with autonomy forced on and asserts no auto-approve,
+  a real decision row, escalation, and a truthful audit entry.
+- **No money movement by an agent** — refunds are a human-only dashboard action;
+  no MCP tool mutates payment or refund state.
+- **Audit** — `audit_log` is append-only (a DB trigger blocks UPDATE/DELETE) and
+  hash-chained; `scripts/verify_audit_chain.py` re-walks it.
+- **Secrets** — Vault only; `structlog` redacts API-key/bearer/DB-URL shapes and
+  any credential-looking log key.
+- **Local-only scope** — dev-mode Vault/Keycloak, plain HTTP on localhost, no
+  TLS. Not a production posture.
 
 ---
 
 ## Demo scenarios
 
-Each is real, runs through the actual pipeline, and behaves exactly as
-`docs/SCENARIOS.md` documents. The automatable ones:
+Every scenario is real — it places orders, submits returns, and drives the
+actual multi-agent pipeline. Each one has a **step-by-step walkthrough** in
+[`docs/scenarios/`](docs/scenarios/): the situation → the exact command → what
+every agent node does → what to check in the DB / audit log / dashboard /
+Langfuse afterwards. [`docs/SCENARIOS.md`](docs/SCENARIOS.md) is the index.
 
 ```bash
-python scripts/run_scenarios.py          # all
-python scripts/run_scenarios.py A2 A5    # named
+python scripts/run_scenarios.py            # the automatable ones end to end (~2 min)
+python scripts/run_scenarios.py --demo     # the audience subset (A0, A2, A5)
+python scripts/run_scenarios.py A5 A7      # named scenarios only
 ```
 
-1. **Easy case** — a return within policy with a matching photo. Auto-approves in
-   seconds at `assist`/`auto`. *Why it matters: autonomy is safe when it's bounded.*
-2. **Mismatched photo** — the return photo isn't the product. The Image agent's
-   similarity score drops, the case escalates. *Why: evidence is checked, not trusted.*
-3. **AI-faked damage photo** — an AI-generated photo. The detector flags it as
-   one signal → escalate, never a lone denial. *Why: one model's opinion is never the verdict.*
-4. **Serial returner** — a high-return-history account; the Behaviour agent flags
-   the pattern even when one return looks fine alone. *Why: context beats the single case.*
-5. **Fraud ring** — two accounts sharing an address; flagged together. *Why:
-   fraud is a graph, not a row.*
-6. **The appeal** — a denied return, contested, routed to a *different* reviewer
-   (conflict-of-interest guard). *Why: fairness needs a fresh pair of eyes.*
-7. **Watching an agent think** — open a case in the dashboard as it runs; the
-   live trace fills in node by node with real tokens/cost/latency. *Why:
-   observability is not an afterthought.*
-8. **The rollout story** — the same easy case in `shadow` (agent decides, human
-   acts, agreement logged) vs `assist` (auto-approved), with the agreement trend
-   and the vs-baseline numbers that justify moving up. *Why: trust is earned, not toggled.*
+| Walkthrough | Route | What it shows |
+|---|---|---|
+| [01 Matching photo](docs/scenarios/01-matching-photo-auto-approve.md) | auto-approve | a clean case clears in seconds through a real CLIP match; a QA sample still queues |
+| [02 Mismatched photo](docs/scenarios/02-mismatched-photo.md) | escalate | the photo is a claim to verify — an unverifiable one goes to a human |
+| [03 AI-faked photo](docs/scenarios/03-ai-faked-damage-photo.md) | escalate | the AI-image detector is one signal, never a lone denial |
+| [04 Serial returner](docs/scenarios/04-serial-returner.md) | escalate | the Behaviour agent scores the history, not just this transaction |
+| [05 Fraud ring](docs/scenarios/05-fraud-ring.md) | escalate | shared-fingerprint accounts linked by the `flag_ring` MCP tool |
+| [06 High value](docs/scenarios/06-high-value-within-policy.md) | escalate | big refunds always get a human, even at level `auto` |
+| [07 Outside the window](docs/scenarios/07-outside-return-window.md) | escalate (proposed deny) | auto-deny is structurally impossible |
+| [08 Incomplete request](docs/scenarios/08-incomplete-request-data-quality.md) | escalate | the data-quality gate refuses to guess |
+| [09 Prompt injection](docs/scenarios/09-prompt-injection.md) | escalate | customer text is data, not instructions; least privilege holds |
+| [10 Kill switch](docs/scenarios/10-kill-switch.md) | escalate (all) | one admin switch overrides every automation level |
+| [11 Automation ladder](docs/scenarios/11-automation-level-ladder.md) | escalate → auto-approve | the same case at `shadow` vs `assist` |
+| [12 Override + appeal](docs/scenarios/12-reviewer-override-and-appeal.md) | human decision | deny-with-confirm, disagreement logged, appeal routed away (COI) |
+
+Operational behaviours (dead-letter, Groq→OpenAI fallback, load) are in the
+`docs/SCENARIOS.md` index, run by `verify_m3_dlq.py` / `loadtest.py`.
 
 ---
 
@@ -234,16 +556,80 @@ python scripts/run_scenarios.py A2 A5    # named
   separate client for presigning.
 - **Bifrost: "provider groq not found".** Bifrost v2 reads `config.json` from
   `/app/data/`, not a `BIFROST_CONFIG_PATH`. And Groq's 2026 catalog dropped the
-  `llama-3.x` ids — the model roles now map to `openai/gpt-oss-*` (ADR-0010).
+  `llama-3.x` ids — the model roles now map to `openai/gpt-oss-*` (see
+  `worker/pipeline/models_config.py`).
 - **ContextForge "Unable to connect to gateway" (502).** The MCP SDK v2 streamable
   server rejects unknown `Host` headers; `mcp-server/server.py` passes
   `TransportSecuritySettings(allowed_hosts=[...])`.
 - **Worker: "at least one function must be registered" even though there is one.**
   `pip install .` had baked a stale copy of the package into site-packages that
   shadowed the bind-mounted source — the Dockerfiles use `pip install -e .`.
-- **First pipeline run is slow (~2 min).** CLIP + the AI-image detector download
-  on first use, then stay resident.
+- **First pipeline run is slow (2–4 min).** CLIP *and* the AI-image detector
+  (~1.5 GB) download on the first return that reaches the Image agent. They land
+  in the `hf_cache` Docker volume, so this happens **once** — it survives
+  `docker compose restart` / `--force-recreate`, and only `make nuke` clears it.
+  `verify_m3` / `verify_m4` in the first `make smoke` after `make nuke` absorb
+  it; every run after is fast.
+- **`worker` container shows `Exited (1)` right after `make up`.** Expected on a
+  fresh stack — `make up` starts the worker before `make migrate`, so its
+  startup query hits a table that doesn't exist yet. It's set to
+  `restart: unless-stopped` and recovers on its own once `make migrate` runs;
+  the crash log during that window is harmless.
+- **Agents' tool calls fail with "no ContextForge virtual server".** `make m4-setup`
+  wasn't run (it writes the per-agent server IDs into Vault and restarts the
+  worker to pick them up). Re-run `make m4-setup`, or just
+  `python scripts/mcp_setup.py && docker compose restart worker`.
+- **`make up` says a port is already in use.** Something else on the host owns
+  5432 / 3000 / 8000 / 8081 / … — stop it, or edit the `ports:` in
+  `docker-compose.yml`.
 
 ---
 
-See `STATUS.md` for exactly what is verified and what is still partial.
+## Contributing
+
+- After editing an agent prompt: bump its `version:` header, then
+  `make sync-prompts` (pushes the new version to Langfuse).
+- After changing the API shape: `cd frontend && npm run gen:api` (regenerates
+  `frontend/lib/api/schema.ts`; the frontend types come straight from it).
+- Policy lives in `infra/opa/*.rego` with its own unit tests: `make opa-test`.
+- `make replay a="<graph_run_id> <node>"` re-runs one pipeline node in isolation;
+  `make reprocess a="--since <date> --dry-run"` batch-re-reviews open returns.
+
+There is **no** pytest / Playwright / eval harness by design; verification is
+`scripts/verify_*.py` + `scripts/run_scenarios.py` driving the live system
+(`make smoke` runs all of it).
+
+---
+
+## What `make smoke` proves (11 checks, all green)
+
+| Check | What it proves against the live system |
+|---|---|
+| `verify_m1` | 18-service stack healthy; `/health/deep` really talks to Postgres/Redis/Qdrant/MinIO/Vault/Bifrost/ContextForge/OPA; alembic at head |
+| `verify_m2` + `_frontend` | register via Keycloak → order → return with a real photo → rows in Postgres + object in MinIO; Next.js shop + Auth.js/Keycloak PKCE |
+| `verify_m3` + `_dlq` | a real Groq call via Bifrost → `agent_runs` with real tokens/cost/latency = API = DB; a real Langfuse trace; WS replay; 3 real crashes → `dead_letter` + auto-escalate, never an infinite retry |
+| `verify_m4` | the full agent graph: every node writes `agent_runs`; Policy does a real Qdrant retrieval; Behavior loads the registered model; `intake`/`policy`/`behavior` call their MCP tools **through ContextForge** (`ok=true` + `call_tool` audit rows); the Image agent's virtual server exposes **zero** tools; GovernanceGate decides **via OPA**; hash chain valid; no auto-deny |
+| `verify_audit_chain` | every `row_hash` recomputes; the chain is unbroken |
+| `run_scenarios` | A0 auto-approve (real CLIP match → `auto_approve` + QA sample), A1 shadow, A2 mismatched photo, A5 fraud ring, A6 high-value, A7 outside-window (proposed-deny → escalate), A10 prompt injection — each matches its walkthrough |
+| `verify_security` | injection via return text + text-in-image → no privilege escalation, no auto-approve; OPA denies the Image agent every tool + the `reason` model role; `slowapi` rate limiting wired; no money-mutating tool |
+| `verify_m5` | reviewer claim → deny-with-confirm → audit chain extended → override logged in `agreement_samples` → `assist` auto-approve path → request-info round trip → refund settlement (`process_refunds` → `refunded` + audit row) |
+| `verify_m6` | this README has every section + working URL; every `make` target / script exists; all 12 walkthroughs valid; the demo scenarios run green |
+
+## Limitations (local-only portfolio scope)
+
+- Dev-mode Vault + Keycloak, plain HTTP on localhost, no TLS — not a production
+  posture.
+- `infra/keycloak/realm-export.json` carries the local Keycloak **client**
+  secrets in plaintext (committed) — local-dev clients only. `frontend/.env.local`
+  (git-ignored) holds the Auth.js + web-client secret.
+- Bifrost virtual keys scope models but aren't on the inference hot path (an OSS
+  v2.0.0 credential-binding limitation) — per-agent model least-privilege is
+  enforced in `models_config` + OPA `authz.rego` instead.
+- OTel spans from Bifrost / ContextForge → Langfuse aren't wired; Langfuse
+  traces come from the SDK directly and are real.
+- The manual scenario walkthroughs (03, 04, 08, 10, 12) are runnable checklists,
+  not clicked-through-with-screenshots.
+- **The Groq + OpenAI keys were exposed in the chat that built this — rotate
+  both**, then `docker compose exec vault vault kv patch
+  secret/returnguard/llm openai_api_key=… groq_api_key=…` and
+  `docker compose restart backend worker`.

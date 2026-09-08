@@ -1,5 +1,5 @@
 """Re-walk the audit_log hash chain and recompute every row_hash with the
-canonical rule (ADR-0003). Fails on any tamper or break.
+canonical hash-chain rule. Fails on any tamper or break.
 """
 from __future__ import annotations
 

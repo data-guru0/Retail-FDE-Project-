@@ -15,7 +15,7 @@ _lock = threading.Lock()
 _clip = None
 _detector = None
 
-# chosen by the ml/detector_bakeoff/ run (ADR-0002): acc 0.92, separation 0.82
+# chosen by the ml/detector_bakeoff/ run: acc 0.92, separation 0.82
 DETECTOR_MODEL = os.getenv("RG_AI_DETECTOR", "haywoodsloan/ai-image-detector-deploy")
 _DEVICE = os.getenv("RG_TORCH_DEVICE", "cpu")
 

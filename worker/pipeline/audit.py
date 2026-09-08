@@ -1,6 +1,6 @@
 """Append-only, hash-chained audit log (worker side).
 
-Canonical row serialization (ADR-0003): a compact JSON object with sorted keys
+Canonical row serialization: a compact JSON object with sorted keys
 over (ts_iso, actor_type, actor_id, action, entity_type, entity_id, data).
 row_hash = sha256(prev_hash + canonical). The DB trigger blocks UPDATE/DELETE.
 `scripts/verify_audit_chain.py` re-walks and recomputes with the identical rule.

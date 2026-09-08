@@ -32,9 +32,16 @@ export function CaseActions({
 
   if (!canAct) return null;
   return (
-    <div className="card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+    <div
+      className="card"
+      style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}
+    >
       <strong>Actions</strong>
-      <button className="btn secondary" disabled={busy} onClick={() => call("claim")}>
+      <button
+        className="btn secondary"
+        disabled={busy}
+        onClick={() => call("claim")}
+      >
         Claim
       </button>
       <textarea

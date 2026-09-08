@@ -1,5 +1,5 @@
 """Append-only, hash-chained audit log (backend side). Identical canonical rule
-to worker/pipeline/audit.py — see ADR-0003.
+to worker/pipeline/audit.py.
 """
 from __future__ import annotations
 

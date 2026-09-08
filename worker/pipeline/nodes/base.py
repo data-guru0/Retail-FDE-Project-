@@ -13,7 +13,7 @@ from pipeline import db
 from pipeline.guardrails import parse_validated
 from pipeline.llm import chat
 from pipeline.observability import record_generation
-from pipeline.prompts.registry import load, prompt_version
+from pipeline.prompts.registry import langfuse_prompt, load, prompt_version
 
 log = structlog.get_logger()
 
@@ -66,6 +66,7 @@ async def run_llm_agent(
         agent=agent, model=result.model, prompt=user, output=result.text,
         return_id=rc.return_id, graph_run_id=rc.graph_run_id,
         tokens_in=result.tokens_in, tokens_out=result.tokens_out, cost=result.cost_usd,
+        langfuse_prompt=langfuse_prompt(prompt_name),
     )
     try:
         from pipeline.metrics import LLM_COST

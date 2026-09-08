@@ -3,13 +3,14 @@ from __future__ import annotations
 import hashlib
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.models import Order, OrderItem, Outbox, Return, ReturnPhoto
+from app.ratelimit import limiter
 from app.schemas import ReturnCreateOut, ReturnOut
 from app.security import Principal, current_user
 from app.services import mail, storage
@@ -44,7 +45,9 @@ def _out(r: Return, photo_urls: list[str]) -> ReturnOut:
 
 
 @router.post("", response_model=ReturnCreateOut, status_code=201)
+@limiter.limit("60/minute")
 async def submit_return(
+    request: Request,
     order_item_id: str = Form(...),
     reason_code: str = Form(...),
     reason_text: str = Form(""),

@@ -3,7 +3,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/app/lib/cart";
 
-export function AddToCart({ id, name, price }: { id: string; name: string; price: number }) {
+export function AddToCart({
+  id,
+  name,
+  price,
+}: {
+  id: string;
+  name: string;
+  price: number;
+}) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
   const router = useRouter();

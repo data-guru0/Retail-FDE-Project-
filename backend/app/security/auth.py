@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-import httpx
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
@@ -109,20 +108,3 @@ def require_role(*allowed: str):
         return p
 
     return _dep
-
-
-async def keycloak_token(username: str, password: str, client_id: str = "returnguard-web") -> str:
-    """Password-grant helper — used only by verify_* / scenario scripts, not the app."""
-    s = get_settings()
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.post(
-            f"{s.keycloak_internal_url}/protocol/openid-connect/token",
-            data={
-                "grant_type": "password",
-                "client_id": client_id,
-                "username": username,
-                "password": password,
-            },
-        )
-        r.raise_for_status()
-        return r.json()["access_token"]

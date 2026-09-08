@@ -1,10 +1,13 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+// eslint-config-next 16 ships native flat config — import the arrays directly.
+// (The old FlatCompat wrapper crashes the config validator with a circular
+// structure on eslint 9.)
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 
-const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
-
-export default [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+const config = [
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   { ignores: [".next/**", "node_modules/**", "lib/api/**"] },
 ];
+
+export default config;

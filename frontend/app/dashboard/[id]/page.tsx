@@ -4,7 +4,11 @@ import { LiveTrace } from "./LiveTrace";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
-export default async function CaseDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function CaseDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const session = await auth();
   const token = (session as unknown as { accessToken?: string }).accessToken;
@@ -18,14 +22,18 @@ export default async function CaseDetail({ params }: { params: Promise<{ id: str
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Case #{id.slice(0, 8)}</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>
+          Case #{id.slice(0, 8)}
+        </h1>
         <div className="card" style={{ padding: 14 }}>
           <div>
-            <strong>Status:</strong> {r.status} &nbsp; <strong>Agent proposed:</strong>{" "}
-            {r.decision ?? "—"} &nbsp; <strong>Final:</strong> {r.final_decision ?? "—"}
+            <strong>Status:</strong> {r.status} &nbsp;{" "}
+            <strong>Agent proposed:</strong> {r.decision ?? "—"} &nbsp;{" "}
+            <strong>Final:</strong> {r.final_decision ?? "—"}
           </div>
           <div>
-            <strong>Customer:</strong> {r.customer} &nbsp; <strong>Amount:</strong> ${r.amount}
+            <strong>Customer:</strong> {r.customer} &nbsp;{" "}
+            <strong>Amount:</strong> ${r.amount}
           </div>
           <div>
             <strong>Reason:</strong> {r.reason_code} — {r.reason_text}
@@ -48,10 +56,14 @@ export default async function CaseDetail({ params }: { params: Promise<{ id: str
             latency_ms: number;
             policy_version: number | null;
           }) => (
-            <details key={a.agent + a.model} className="card" style={{ padding: 12 }}>
+            <details
+              key={a.agent + a.model}
+              className="card"
+              style={{ padding: 12 }}
+            >
               <summary>
-                <strong>{a.agent}</strong> · {a.model} · conf {a.confidence ?? "—"} · $
-                {a.cost_usd} · {a.latency_ms}ms
+                <strong>{a.agent}</strong> · {a.model} · conf{" "}
+                {a.confidence ?? "—"} · ${a.cost_usd} · {a.latency_ms}ms
                 {a.policy_version ? ` · policy v${a.policy_version}` : ""}
               </summary>
               <pre style={{ overflowX: "auto", fontSize: 12 }}>
@@ -64,7 +76,12 @@ export default async function CaseDetail({ params }: { params: Promise<{ id: str
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {data.photo_urls.map((u: string) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={u} src={u} alt="return" style={{ width: 180, borderRadius: 8 }} />
+            <img
+              key={u}
+              src={u}
+              alt="return"
+              style={{ width: 180, borderRadius: 8 }}
+            />
           ))}
         </div>
       </div>

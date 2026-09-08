@@ -17,7 +17,11 @@ export default function CartPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>Cart</h1>
       {items.map((i) => (
-        <div key={i.product_id} className="card" style={{ padding: 12, display: "flex", gap: 12 }}>
+        <div
+          key={i.product_id}
+          className="card"
+          style={{ padding: 12, display: "flex", gap: 12 }}
+        >
           <div style={{ flex: 1 }}>{i.name}</div>
           <div>${i.price.toFixed(2)}</div>
           <input
@@ -29,10 +33,18 @@ export default function CartPage() {
             onChange={(e) => setQty(i.product_id, Number(e.target.value))}
             style={{ width: 70 }}
           />
-          <div style={{ width: 80, textAlign: "right" }}>${(i.price * i.qty).toFixed(2)}</div>
+          <div style={{ width: 80, textAlign: "right" }}>
+            ${(i.price * i.qty).toFixed(2)}
+          </div>
         </div>
       ))}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <strong>Total: ${total.toFixed(2)}</strong>
         <Link href="/shop/checkout" className="btn">
           Checkout

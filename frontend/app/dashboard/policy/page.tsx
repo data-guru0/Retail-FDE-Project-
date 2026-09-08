@@ -15,8 +15,9 @@ export default async function PolicyPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>Policy editor</h1>
       <p className="muted">
-        Saving creates a new <code>policy_docs</code> version and re-embeds it into Qdrant. Later
-        cases record which version applied (<code>agent_runs.policy_version</code>).
+        Saving creates a new <code>policy_docs</code> version and re-embeds it
+        into Qdrant. Later cases record which version applied (
+        <code>agent_runs.policy_version</code>).
       </p>
       <PolicyEditor docs={docs} />
     </div>

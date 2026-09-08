@@ -1,30 +1,23 @@
-"""Upload hardening: magic-byte sniff, size cap, Pillow re-encode to strip
-EXIF / any embedded payload. Returns clean JPEG bytes.
+"""Upload hardening: content-type sniff (magic bytes via `filetype`), size cap,
+Pillow re-encode to strip EXIF / any embedded payload. Returns clean JPEG bytes.
 """
 from __future__ import annotations
 
 import io
 
+import filetype
 from fastapi import HTTPException
 from PIL import Image
 
 MAX_BYTES = 8 * 1024 * 1024
-_MAGIC = {
-    b"\xff\xd8\xff": "image/jpeg",
-    b"\x89PNG\r\n\x1a\n": "image/png",
-    b"RIFF": "image/webp",  # RIFF....WEBP
-    b"GIF87a": "image/gif",
-    b"GIF89a": "image/gif",
-}
+_ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
 def sniff(data: bytes) -> str:
-    for magic, mime in _MAGIC.items():
-        if data.startswith(magic):
-            if mime == "image/webp" and data[8:12] != b"WEBP":
-                continue
-            return mime
-    raise HTTPException(415, "unsupported or unrecognised image format")
+    kind = filetype.guess(data)
+    if kind is None or kind.mime not in _ALLOWED:
+        raise HTTPException(415, "unsupported or unrecognised image format")
+    return kind.mime
 
 
 def clean_image(data: bytes) -> tuple[bytes, str]:

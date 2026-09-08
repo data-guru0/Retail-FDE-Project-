@@ -14,8 +14,8 @@ export default async function Appeals() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>Appeals</h1>
       <p className="muted">
-        A denied return can be contested. The appeal routes to a reviewer who is not the one who
-        decided it (conflict-of-interest guard).
+        A denied return can be contested. The appeal routes to a reviewer who is
+        not the one who decided it (conflict-of-interest guard).
       </p>
       {rows.length === 0 && <p className="muted">no appeals</p>}
       {rows.map(

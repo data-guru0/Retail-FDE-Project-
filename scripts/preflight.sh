@@ -13,7 +13,7 @@ if [ ! -f .env ]; then
 fi
 
 # ports we bind on the host
-PORTS=(5432 6379 6333 9000 9001 8025 8200 8081 8090 8070 4444 3001 8000 3002 9090)
+PORTS=(5432 6379 6333 9000 9001 8025 8200 8081 8090 8070 8181 4444 3001 8000 3002 9090)
 busy=()
 for p in "${PORTS[@]}"; do
   if (command -v ss >/dev/null && ss -ltn "( sport = :$p )" 2>/dev/null | grep -q LISTEN) \

@@ -11,6 +11,14 @@ from pathlib import Path
 import httpx
 import psycopg
 
+# LLM output (Critic vetoes, explanations) contains curly quotes / em-dashes that
+# the Windows console (cp1252) can't encode — print them instead of crashing.
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 
 def _dotenv() -> dict[str, str]:
     f = Path(__file__).resolve().parents[1] / ".env"

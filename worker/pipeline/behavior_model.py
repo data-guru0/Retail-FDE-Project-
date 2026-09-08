@@ -14,8 +14,7 @@ _lock = threading.Lock()
 _bundle = None
 _version = None
 
-REGISTRY = pathlib.Path("/app/../ml/registry")  # worker mounts ./ml at /app/ml in M4
-_ALT = pathlib.Path("/app/ml/registry")
+REGISTRY = pathlib.Path("/app/ml/registry")  # worker mounts ./ml at /app/ml
 
 
 def _load():
@@ -27,13 +26,12 @@ def _load():
             return
         import joblib
 
-        reg = _ALT if _ALT.exists() else REGISTRY
-        latest = reg / "LATEST"
+        latest = REGISTRY / "LATEST"
         if not latest.exists():
             log.warning("behavior_model.no_registered_model")
             return
         _version = latest.read_text().strip()
-        _bundle = joblib.load(reg / _version / "model.joblib")
+        _bundle = joblib.load(REGISTRY / _version / "model.joblib")
         log.info("behavior_model.loaded", version=_version)
 
 
@@ -128,19 +126,3 @@ def risk_score(ctx: dict) -> tuple[float, str, dict]:
 
 async def prepare(ctx: dict) -> None:
     ctx["_behavior_extra"] = await _extra_features(ctx)
-
-
-async def ring_accounts(user_id: str) -> list[str]:
-    from pipeline import db
-
-    rows = await db.fetchall(
-        """
-        SELECT DISTINCT f2.user_id::text AS uid
-        FROM fingerprints f1
-        JOIN fingerprints f2
-          ON f1.value_hash = f2.value_hash AND f1.kind = f2.kind AND f2.user_id <> f1.user_id
-        WHERE f1.user_id = %(uid)s
-        """,
-        {"uid": user_id},
-    )
-    return [r["uid"] for r in rows]

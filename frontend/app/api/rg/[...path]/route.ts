@@ -23,7 +23,9 @@ async function proxy(req: Request, path: string[]) {
   const body = await res.arrayBuffer();
   return new Response(body, {
     status: res.status,
-    headers: { "content-type": res.headers.get("content-type") ?? "application/json" },
+    headers: {
+      "content-type": res.headers.get("content-type") ?? "application/json",
+    },
   });
 }
 

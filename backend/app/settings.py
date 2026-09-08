@@ -38,6 +38,7 @@ class Settings(BaseModel):
     langfuse_secret_key: str
 
     mcp_gateway_url: str
+    opa_url: str
 
     # governance thresholds — live defaults; overridable per run via feature_flags
     tau_risk: float = 0.30
@@ -78,4 +79,5 @@ def get_settings() -> Settings:
         langfuse_public_key=lf["public_key"],
         langfuse_secret_key=lf["secret_key"],
         mcp_gateway_url=mcp["gateway_url"],
+        opa_url=os.getenv("RG_OPA_URL", "http://opa:8181"),
     )

@@ -23,7 +23,7 @@ upstream `mcp-server`.
 3. writes the per-agent server ids to `scenarios/mcp_setup.json` + Vault
    (`secret/returnguard/mcp` → `agent_servers`).
 
-## Auth (JWKS known-unknown — ADR-0009)
+## Auth (JWKS known-unknown)
 
 The OSS 0.5.0 build authenticates callers with **its own JWT**
 (`JWT_SECRET_KEY` env), not by validating external Keycloak JWTs against Keycloak's

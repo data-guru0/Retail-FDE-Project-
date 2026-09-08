@@ -20,18 +20,29 @@ export function LiveTrace({ id, initial }: { id: string; initial: Ev[] }) {
   }, [id]);
 
   return (
-    <div className="card" style={{ padding: 12, maxHeight: 480, overflowY: "auto" }}>
+    <div
+      className="card"
+      style={{ padding: 12, maxHeight: 480, overflowY: "auto" }}
+    >
       {events.map((e, i) => (
-        <div key={i} style={{ borderBottom: "1px solid var(--border)", padding: "6px 0" }}>
+        <div
+          key={i}
+          style={{ borderBottom: "1px solid var(--border)", padding: "6px 0" }}
+        >
           <div style={{ fontSize: 13 }}>
             <strong>{e.agent}</strong> · {e.kind}
           </div>
-          <pre className="muted" style={{ fontSize: 11, overflowX: "auto", margin: 0 }}>
+          <pre
+            className="muted"
+            style={{ fontSize: 11, overflowX: "auto", margin: 0 }}
+          >
             {JSON.stringify(e.payload, null, 1)}
           </pre>
         </div>
       ))}
-      {events.length === 0 && <div className="muted">waiting for pipeline events…</div>}
+      {events.length === 0 && (
+        <div className="muted">waiting for pipeline events…</div>
+      )}
     </div>
   );
 }

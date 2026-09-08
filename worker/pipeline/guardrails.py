@@ -1,23 +1,23 @@
-"""Validate LLM JSON against a schema; on failure, one real repair round-trip
-that hands the model its own bad output + the validation error.
+"""Validate LLM JSON against a schema. Extraction/repair of the raw text is done
+by `json-repair` (handles markdown fences, trailing junk, truncation, unquoted
+keys). If the repaired object still fails the schema, one real LLM repair
+round-trip hands the model its own bad output + the validation error.
 """
 from __future__ import annotations
 
-import json
-
+from json_repair import repair_json
 from jsonschema import Draft202012Validator
 
 from pipeline.llm import LLMResult, chat
 
 
 def _extract_json(text: str) -> dict:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```", 2)[1].removeprefix("json").strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
+    obj = repair_json(text, return_objects=True)
+    if isinstance(obj, list) and obj:
+        obj = obj[0]
+    if not isinstance(obj, dict) or not obj:
         raise ValueError(f"no JSON object in model output: {text[:200]}")
-    return json.loads(text[start : end + 1])
+    return obj
 
 
 def parse_validated(
@@ -38,7 +38,7 @@ def parse_validated(
         if not errs:
             return obj, result
         problem = "; ".join(e.message for e in errs[:5])
-    except (ValueError, json.JSONDecodeError) as e:
+    except ValueError as e:
         problem = str(e)
 
     repair = chat(

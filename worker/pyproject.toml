@@ -19,9 +19,11 @@ dependencies = [
   "langgraph-checkpoint-postgres==3.1.2",
   "langfuse==3.0.4",
   "jsonschema==4.26.0",
+  "json-repair==0.63.4",
   "boto3==1.43.83",
   "qdrant-client==1.19.0",
   "prometheus-client==0.26.0",
+  "PyJWT==2.13.0",
 ]
 
 [project.optional-dependencies]

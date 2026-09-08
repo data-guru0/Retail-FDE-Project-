@@ -38,7 +38,14 @@ export async function Nav() {
           Dashboard
         </a>
       )}
-      <div style={{ marginLeft: "auto", display: "flex", gap: "1rem", alignItems: "center" }}>
+      <div
+        style={{
+          marginLeft: "auto",
+          display: "flex",
+          gap: "1rem",
+          alignItems: "center",
+        }}
+      >
         <CartBadge />
         {session ? (
           <form
@@ -47,7 +54,9 @@ export async function Nav() {
               await signOut({ redirectTo: "/" });
             }}
           >
-            <button className="btn secondary">Sign out ({session.user?.email})</button>
+            <button className="btn secondary">
+              Sign out ({session.user?.email})
+            </button>
           </form>
         ) : (
           <form

@@ -4,7 +4,9 @@ const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 function J({ v }: { v: unknown }) {
   return (
-    <pre style={{ overflowX: "auto", fontSize: 12 }}>{JSON.stringify(v, null, 2)}</pre>
+    <pre style={{ overflowX: "auto", fontSize: 12 }}>
+      {JSON.stringify(v, null, 2)}
+    </pre>
   );
 }
 
@@ -13,9 +15,17 @@ export default async function Analytics() {
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const h = { authorization: `Bearer ${token}` };
   const [a, health, rings] = await Promise.all([
-    fetch(`${BACKEND}/dashboard/analytics`, { headers: h, cache: "no-store" }).then((r) => r.json()),
-    fetch(`${BACKEND}/dashboard/agent-health`, { headers: h, cache: "no-store" }).then((r) => r.json()),
-    fetch(`${BACKEND}/dashboard/rings`, { headers: h, cache: "no-store" }).then((r) => r.json()),
+    fetch(`${BACKEND}/dashboard/analytics`, {
+      headers: h,
+      cache: "no-store",
+    }).then((r) => r.json()),
+    fetch(`${BACKEND}/dashboard/agent-health`, {
+      headers: h,
+      cache: "no-store",
+    }).then((r) => r.json()),
+    fetch(`${BACKEND}/dashboard/rings`, { headers: h, cache: "no-store" }).then(
+      (r) => r.json(),
+    ),
   ]);
 
   return (

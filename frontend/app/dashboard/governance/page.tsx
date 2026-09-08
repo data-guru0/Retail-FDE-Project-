@@ -15,9 +15,9 @@ export default async function GovernancePage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>Governance</h1>
       <p className="muted">
-        shadow → suggest → assist → auto. Every deployment starts in shadow; moving up is a
-        deliberate act, justified by the agreement trend. The kill switch forces every case to a
-        human regardless of level.
+        shadow → suggest → assist → auto. Every deployment starts in shadow;
+        moving up is a deliberate act, justified by the agreement trend. The
+        kill switch forces every case to a human regardless of level.
       </p>
       {flags.map((f: Record<string, unknown>) => (
         <GovernanceForm key={f.scope as string} flag={f} />

@@ -122,8 +122,11 @@ return/refund request. Consumed by the Behavior agent as ONE signal into the
 Decision agent. **Never** a lone auto-deny; a human confirms every denial.
 
 ## Not for
-Any decision about a person outside this return-review context. No
-protected-attribute data is used or available (see docs/FAIRNESS.md).
+Any decision about a person outside this return-review context. The model scores
+*transactions*, not people: it holds no protected-attribute data and no obvious
+proxy for one (address is used only as a fingerprint hash for ring detection,
+never as a location signal). It is one signal among several and never decides
+alone. See the README's "Security notes" for how that boundary is enforced.
 
 ## Training data
 Synthetic (`ml/generate_dataset.py`, seed {SEED}), {n_rows} rows.
@@ -154,11 +157,7 @@ prefit) on a 60/20/20 train/val/test split, seed {SEED}.
   recalibration.
 - Correlated features (the shared-fingerprint trio) — importance is split across them.
 """
-    (out / "MODEL_CARD.md").write_text(card)
-    # mirror to docs/ when that tree is present (host runs); harmless if not (worker container)
-    docs = pathlib.Path(__file__).parents[1] / "docs"
-    if docs.is_dir():
-        (docs / "MODEL_CARD.md").write_text(card)
+    (out / "MODEL_CARD.md").write_text(card)   # the card lives with its model version
 
 
 def _register(version, out, metrics, dhash) -> None:

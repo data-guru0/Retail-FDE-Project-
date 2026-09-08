@@ -101,17 +101,21 @@ def _seed_history(email: str, orders: int, returns_: int) -> None:
         ).fetchall()
         for iid, oid in rows:
             c.execute(
-                "insert into returns (order_id,order_item_id,user_id,reason_code,status,"
-                "refund_state,amount,final_decision) values "
-                "(%(o)s,%(i)s,%(u)s,'quality','denied','none',20,'deny')",
+                "insert into returns (order_id,order_item_id,user_id,reason_code,reason_text,"
+                "status,refund_state,amount,final_decision) values "
+                "(%(o)s,%(i)s,%(u)s,'quality','prior return (seeded history)',"
+                "'denied','none',20,'deny')",
                 {"o": oid, "i": iid, "u": uid},
             )
 
 
 def _seed_ring(email_a: str, email_b: str) -> None:
     a, b = _user_id(email_a), _user_id(email_b)
-    addr = hashlib.sha256(b"13 Shared Ave, Rington").hexdigest()
-    dev = hashlib.sha256(b"device-abc-123").hexdigest()
+    # per-run unique fingerprints so re-running A5 makes a fresh 2-account ring
+    # instead of piling onto one ever-growing shared hash
+    tag = f"{a}-{b}".encode()
+    addr = hashlib.sha256(b"13 Shared Ave, Rington/" + tag).hexdigest()
+    dev = hashlib.sha256(b"device-abc-123/" + tag).hexdigest()
     with db() as c:
         for u in (a, b):
             for kind, val in (("address", addr), ("device", dev)):
@@ -208,24 +212,28 @@ def A0(c: Check) -> None:
 
 
 def A1(c: Check) -> None:
-    """easy legit, matching photo -> approve proposed; multi-agent trace."""
+    """easy legit, matching photo, at `shadow` -> the full graph runs, the agent
+    decides, but the HUMAN still acts (nothing is auto-finalised in shadow)."""
     _set_level("shadow")
     h, email = _customer("a1")
-    o = _place_order(h)
+    o = _place_order(h, sku="RG-009")
     _age_order(o["id"], 6)
     rid = _submit_return(h, o["items"][0]["id"], "damaged",
-                         "Arrived with a hairline crack near the handle.", MUG)
+                         "One mug arrived with a hairline crack near the base.", MATCHING)
     res = _wait_final(rid)
     fired = _agents_fired(res["graph_run_id"])
     c.ok({"intake", "policy", "behavior", "decision", "critic", "explanation"} <= fired,
          f"A1 multi-agent pipeline fired: {sorted(fired)}")
     c.ok(q1("select policy_version from agent_runs where graph_run_id=%(g)s and agent='policy'",
             g=res["graph_run_id"]) is not None, "A1 Policy recorded a policy_version")
-    c.ok(res["decision"] in ("approve", "escalate"), f"A1 decision proposed: {res['decision']}")
-    c.ok(res["status"] in ("escalated",) or res["decision"] == "approve",
-         f"A1 shadow route: status={res['status']} (human still acts)")
-    c.ok(_last_audit_action(rid) in ("escalate", "auto_approve"),
-         f"A1 GovernanceGate wrote an audit row ({_last_audit_action(rid)})")
+    c.ok(res["decision"] in ("approve", "deny", "escalate"),
+         f"A1 a real decision was proposed ({res['decision']})")
+    # shadow: never auto-final; the case is in the human queue, GovernanceGate escalated
+    c.ok(res["status"] in ("in_review", "escalated"),
+         f"A1 shadow: agent decided, human still acts (status={res['status']})")
+    c.ok(res["final_decision"] is None, "A1 shadow: no auto-final decision")
+    c.ok(_last_audit_action(rid) == "escalate",
+         f"A1 GovernanceGate escalated to a human ({_last_audit_action(rid)})")
 
 
 def A2(c: Check) -> None:

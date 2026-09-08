@@ -10,10 +10,35 @@ import time
 
 import structlog
 
-from pipeline import db
+from pipeline import audit, db, mcp_client
 from pipeline.nodes.base import RunCtx, record_local_agent, run_llm_agent
 
 log = structlog.get_logger()
+
+# Canonical policy math lives in mcp-server/tools.py `check_policy`; the pipeline
+# reads its verdict. This mirror is only a fail-safe so high-value escalation
+# still fires if that tool call fails (a governance guarantee, not a tunable).
+HIGH_VALUE_USD = 250
+
+
+async def _tool(rc: RunCtx, state: dict, agent: str, tool: str, **args) -> dict:
+    """Call an MCP tool as `agent`, through ContextForge. Emits a `tool_call`
+    trace event + an `audit_log` row (CLAUDE.md: every call_tool is audited)."""
+    try:
+        result = mcp_client.call(agent, tool, **args)
+        ok, payload = True, result
+    except Exception as e:  # noqa: BLE001
+        ok, payload = False, {"error": f"{type(e).__name__}: {e}"}
+        log.warning("tool.failed", agent=agent, tool=tool, error=str(payload))
+    await rc.emit(state, "tool_call", agent,
+                  {"tool": tool, "args": args, "ok": ok, "via": "contextforge",
+                   "result_keys": sorted(payload)[:8]})
+    await audit.append(
+        actor_type="agent", actor_id=f"agent-{agent}", action="call_tool",
+        entity_type="return", entity_id=rc.return_id,
+        data={"tool": tool, "args": args, "ok": ok, "gateway": "contextforge"},
+    )
+    return payload if ok else {}
 
 
 def _rc(state: dict) -> RunCtx:
@@ -92,6 +117,12 @@ async def planner(state: dict) -> dict:
 # --------------------------------------------------------------- intake
 async def intake(state: dict) -> dict:
     rc = _rc(state)
+    ctx = state["context"]
+    order = await _tool(rc, state, "intake", "get_order", order_id=ctx["order_id"])
+    facts = _facts(ctx)
+    facts["order_lookup"] = {"found": order.get("found"),
+                             "line_items": order.get("items"),
+                             "order_status": (order.get("order") or {}).get("status")}
     schema = {
         "type": "object", "required": ["complete", "reason"],
         "properties": {"complete": {"type": "boolean"},
@@ -100,7 +131,7 @@ async def intake(state: dict) -> dict:
                        "confidence": {"type": "number"}},
     }
     out = await run_llm_agent(rc, state, agent="intake", prompt_name="intake",
-                              role="fast", facts=_facts(state["context"]), schema=schema)
+                              role="fast", facts=facts, schema=schema)
     return {"intake": out}
 
 
@@ -117,9 +148,18 @@ async def policy(state: dict) -> dict:
     await rc.emit(state, "rag", "policy",
                   {"query": query, "hits": [d["slug"] for d in docs], "policy_version": version})
 
+    # machine-checkable window / high-value verdict, via the check_policy MCP tool
+    verdict = await _tool(rc, state, "policy", "check_policy",
+                          category=ctx["category"],
+                          days_since_order=int(_facts(ctx)["days_since_order"] or 0),
+                          refund_amount=float(ctx["amount"]))
+
     facts = _facts(ctx)
     facts["retrieved_policy"] = [{"slug": d["slug"], "title": d["title"], "text": d["body"]}
                                 for d in docs]
+    facts["policy_tool_verdict"] = {k: verdict.get(k) for k in
+                                    ("within_standard_window", "high_value_needs_human",
+                                     "standard_window_days")}
     schema = {
         "type": "object", "required": ["eligible", "reason"],
         "properties": {"eligible": {"enum": ["yes", "no", "unclear"]},
@@ -129,7 +169,7 @@ async def policy(state: dict) -> dict:
                        "confidence": {"type": "number"}},
     }
     rc.policy_version = version
-    high_value = float(ctx["amount"]) > 250
+    high_value = bool(verdict.get("high_value_needs_human")) or float(ctx["amount"]) > HIGH_VALUE_USD
     out = await run_llm_agent(
         rc, state, agent="policy", prompt_name="policy", role="reason",
         facts=facts, schema=schema, max_tokens=700,
@@ -221,16 +261,23 @@ async def behavior(state: dict) -> dict:
 
     await bm.prepare(ctx)
     score, model_version, feats = bm.risk_score(ctx)
-    ring = await bm.ring_accounts(ctx["user_id"])
+
+    # customer history + ring detection go through the MCP tools (via ContextForge)
+    history = await _tool(rc, state, "behavior", "get_customer_history",
+                          user_id=ctx["user_id"])
+    ring_res = await _tool(rc, state, "behavior", "flag_ring", user_id=ctx["user_id"])
+    ring = [a["user_id"] for a in ring_res.get("linked_accounts", [])]
+
     await record_local_agent(
         rc, state, agent="behavior",
         output={"risk_score": score, "model_version": model_version,
-                "ring_accounts": ring, "features": feats},
+                "ring_accounts": ring, "customer_history": history, "features": feats},
         model=f"behavior_risk:{model_version}",
         latency_ms=int((time.perf_counter() - t0) * 1000),
     )
     await rc.emit(state, "node_end", "behavior",
-                  {"risk_score": score, "model_version": model_version, "ring_accounts": ring})
+                  {"risk_score": score, "model_version": model_version,
+                   "ring_accounts": ring, "return_rate": history.get("return_rate")})
 
     schema = {
         "type": "object", "required": ["pattern", "abuse_likelihood"],
@@ -240,9 +287,8 @@ async def behavior(state: dict) -> dict:
     }
     facts = {
         "model_risk_score": score,
-        "customer_lifetime_orders": ctx["user_order_count"],
-        "customer_lifetime_returns": ctx["user_return_count"],
-        "shared_fingerprint_accounts": len(ring),
+        "customer_history": history,
+        "shared_fingerprint_accounts": ring_res.get("linked_account_count", len(ring)),
         "ring_account_ids": ring[:10],
     }
     llm = await run_llm_agent(rc, state, agent="behavior", prompt_name="behavior",

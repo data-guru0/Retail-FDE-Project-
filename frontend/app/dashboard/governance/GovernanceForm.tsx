@@ -26,7 +26,16 @@ export function GovernanceForm({ flag }: { flag: Record<string, unknown> }) {
   }
 
   return (
-    <div className="card" style={{ padding: 14, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+    <div
+      className="card"
+      style={{
+        padding: 14,
+        display: "flex",
+        gap: 16,
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
       <strong style={{ minWidth: 90 }}>{String(f.scope)}</strong>
       <label>
         level{" "}

@@ -19,14 +19,19 @@ async def startup(ctx: dict) -> None:
         pass  # already bound (reload)
     # self-heal: a return stuck 'in_review' with no decision and no recent
     # progress means a worker died mid-graph. Release it back to the queue.
-    freed = await db.fetchval(
-        "WITH x AS (UPDATE returns SET status='pending' "
-        "WHERE status='in_review' AND decision IS NULL AND final_decision IS NULL "
-        "AND updated_at < now() - interval '90 seconds' RETURNING id) "
-        "SELECT count(*) FROM x"
-    )
-    if freed:
-        log.warning("worker.startup.reclaimed_stuck_returns", n=freed)
+    # Best-effort — on a fresh stack the schema may not exist yet (`make up`
+    # starts the worker before `make migrate`); that's fine, nothing to heal.
+    try:
+        freed = await db.fetchval(
+            "WITH x AS (UPDATE returns SET status='pending' "
+            "WHERE status='in_review' AND decision IS NULL AND final_decision IS NULL "
+            "AND updated_at < now() - interval '90 seconds' RETURNING id) "
+            "SELECT count(*) FROM x"
+        )
+        if freed:
+            log.warning("worker.startup.reclaimed_stuck_returns", n=freed)
+    except Exception as e:  # noqa: BLE001 — never let self-heal block startup
+        log.warning("worker.startup.selfheal_skipped", error=f"{type(e).__name__}: {e}")
     log.info("worker.startup")
 
 

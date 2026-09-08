@@ -24,24 +24,34 @@ export default async function Queue({
   const status = sp.status ?? "escalated";
   const session = await auth();
   const token = (session as unknown as { accessToken?: string }).accessToken;
-  const rows: Row[] = await fetch(`${BACKEND}/dashboard/queue?status=${status}`, {
-    headers: { authorization: `Bearer ${token}` },
-    cache: "no-store",
-  }).then((r) => r.json());
+  const rows: Row[] = await fetch(
+    `${BACKEND}/dashboard/queue?status=${status}`,
+    {
+      headers: { authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  ).then((r) => r.json());
+  // server component: one render per request, so a single "now" is stable here
+  // eslint-disable-next-line react-hooks/purity -- RSC render is request-scoped
+  const renderedAt = Date.now();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", gap: 8 }}>
-        {["escalated", "in_review", "info_requested", "approved", "denied"].map((s) => (
-          <Link
-            key={s}
-            href={`/dashboard?status=${s}`}
-            className="btn secondary"
-            style={{ borderColor: s === status ? "var(--accent)" : "var(--border)" }}
-          >
-            {s}
-          </Link>
-        ))}
+        {["escalated", "in_review", "info_requested", "approved", "denied"].map(
+          (s) => (
+            <Link
+              key={s}
+              href={`/dashboard?status=${s}`}
+              className="btn secondary"
+              style={{
+                borderColor: s === status ? "var(--accent)" : "var(--border)",
+              }}
+            >
+              {s}
+            </Link>
+          ),
+        )}
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
@@ -59,7 +69,10 @@ export default async function Queue({
           {rows.map((r) => (
             <tr key={r.id} style={{ borderTop: "1px solid var(--border)" }}>
               <td style={{ padding: 8 }}>
-                <Link href={`/dashboard/${r.id}`} style={{ color: "var(--accent)" }}>
+                <Link
+                  href={`/dashboard/${r.id}`}
+                  style={{ color: "var(--accent)" }}
+                >
                   #{r.id.slice(0, 8)}
                 </Link>
               </td>
@@ -68,7 +81,10 @@ export default async function Queue({
               <td>${r.amount}</td>
               <td>{r.decision ?? "—"}</td>
               <td className="muted">
-                {Math.round((Date.now() - new Date(r.created_at).getTime()) / 60000)}m
+                {Math.round(
+                  (renderedAt - new Date(r.created_at).getTime()) / 60000,
+                )}
+                m
               </td>
               <td className="muted">{r.claimed_by ? "yes" : "—"}</td>
             </tr>

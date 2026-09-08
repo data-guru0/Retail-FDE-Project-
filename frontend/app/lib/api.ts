@@ -1,53 +1,29 @@
-export type Product = {
-  id: string;
-  sku: string;
-  name: string;
-  description: string;
-  category: string;
-  price: string;
-  image_url: string;
-  stock: number;
-};
+/**
+ * The single API entry point for the frontend.
+ *
+ * Types come straight from the backend's OpenAPI schema
+ * (`frontend/lib/api/schema.ts`, regenerated with `npm run gen:api`) — no
+ * hand-maintained shapes, so the client can't drift from the API.
+ *
+ * All calls go through the server-side proxy at `/api/rg/*`, which attaches the
+ * Keycloak access token (the token never reaches the browser).
+ */
+import createClient from "openapi-fetch";
 
-export type OrderItem = {
-  id: string;
-  product_id: string;
-  name: string;
-  unit_price: string;
-  qty: number;
-};
-export type Order = {
-  id: string;
-  status: string;
-  total: string;
-  payment_last4: string;
-  placed_at: string;
-  items: OrderItem[];
-};
+import type { components, paths } from "@/lib/api/schema";
 
-export type ReturnRow = {
-  id: string;
-  order_id: string;
-  order_item_id: string;
-  reason_code: string;
-  reason_text: string;
-  status: string;
-  refund_state: string;
-  amount: string;
-  decision: string | null;
-  decision_reason: string | null;
-  final_decision: string | null;
-  created_at: string;
-  photo_urls: string[];
-};
+export type Product = components["schemas"]["ProductOut"];
+export type Order = components["schemas"]["OrderOut"];
+export type OrderItem = components["schemas"]["OrderItemOut"];
+export type ReturnRow = components["schemas"]["ReturnOut"];
+export type CheckoutIn = components["schemas"]["CheckoutIn"];
 
-const BASE = "/api/rg";
+/** Typed client — `client.GET("/products", …)`, `client.POST("/orders", …)`. */
+export const client = createClient<paths>({ baseUrl: "/api/rg" });
 
+/** Thin helper for the few call sites that just want the parsed body or a throw. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}/${path}`, { cache: "no-store", ...init });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
-  }
+  const res = await fetch(`/api/rg/${path}`, { cache: "no-store", ...init });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
 }

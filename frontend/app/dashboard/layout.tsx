@@ -2,7 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const session = await auth();
   const roles = (session?.user as unknown as { roles?: string[] })?.roles ?? [];
   if (!session || !(roles.includes("reviewer") || roles.includes("admin"))) {
