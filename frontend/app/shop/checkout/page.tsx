@@ -1,8 +1,18 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useCart } from "@/app/lib/cart";
 import { client } from "@/app/lib/api";
+
+/** FastAPI errors are `{detail: string}` or `{detail: [{msg}, …]}` — never render the object. */
+function errText(error: unknown, status?: number): string {
+  const d = (error as { detail?: unknown } | null | undefined)?.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d))
+    return d.map((e) => (e as { msg?: string })?.msg ?? String(e)).join("; ");
+  return status ? `checkout failed (HTTP ${status})` : "checkout failed";
+}
 
 export default function CheckoutPage() {
   const { items, total, clear } = useCart();
@@ -23,7 +33,7 @@ export default function CheckoutPage() {
   async function submit() {
     setBusy(true);
     setErr("");
-    const { data, error } = await client.POST("/orders", {
+    const { data, error, response } = await client.POST("/orders", {
       body: {
         lines: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
         shipping_address: { line1: form.line1, city: form.city, zip: form.zip },
@@ -33,7 +43,13 @@ export default function CheckoutPage() {
       },
     });
     if (error || !data) {
-      setErr(String(error ?? "checkout failed"));
+      if (response?.status === 401) {
+        // not signed in (or session expired) — send them to Keycloak, then back
+        // here; the cart is in localStorage so it survives the round trip.
+        void signIn("keycloak", { callbackUrl: "/shop/checkout" });
+        return;
+      }
+      setErr(errText(error, response?.status));
       setBusy(false);
       return;
     }

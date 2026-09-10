@@ -12,9 +12,11 @@ export function AnswerInfoRequest({
   const router = useRouter();
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   async function send() {
     setBusy(true);
+    setErr("");
     const fd = new FormData();
     fd.set("answer", answer);
     const res = await fetch(`/api/rg/returns/${returnId}/info-request`, {
@@ -23,6 +25,7 @@ export function AnswerInfoRequest({
     });
     setBusy(false);
     if (res.ok) router.refresh();
+    else setErr(`could not send — ${res.status}: ${await res.text()}`);
   }
 
   return (
@@ -44,6 +47,9 @@ export function AnswerInfoRequest({
       >
         {busy ? "Sending…" : "Send answer — this re-opens the review"}
       </button>
+      {err && (
+        <div style={{ color: "#ff8a8a", marginTop: 8 }}>{err}</div>
+      )}
     </div>
   );
 }

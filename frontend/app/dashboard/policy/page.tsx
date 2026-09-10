@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PolicyEditor } from "./PolicyEditor";
 
@@ -5,6 +6,7 @@ const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 export default async function PolicyPage() {
   const session = await auth();
+  if (!session) redirect("/");
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const docs = await fetch(`${BACKEND}/dashboard/policy`, {
     headers: { authorization: `Bearer ${token}` },

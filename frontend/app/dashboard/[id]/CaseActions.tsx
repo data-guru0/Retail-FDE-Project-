@@ -6,16 +6,27 @@ export function CaseActions({
   id,
   canAct,
   status,
+  level,
+  agentDecision,
+  agentReason,
 }: {
   id: string;
   canAct: boolean;
   status: string;
+  level?: string;
+  agentDecision?: string | null;
+  agentReason?: string | null;
 }) {
   const router = useRouter();
-  const [note, setNote] = useState("");
+  const done = ["approved", "denied", "refunded"].includes(status);
+  // `suggest` mode: pre-fill the reviewer's screen with the agent's proposal.
+  // Same routing as `shadow` (the case is still escalated) — this is the only
+  // thing that makes suggest different from shadow: the human starts from the
+  // agent's answer instead of a blank form.
+  const suggest = level === "suggest" && !!agentDecision && !done;
+  const [note, setNote] = useState(suggest ? agentReason ?? "" : "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const done = ["approved", "denied", "refunded"].includes(status);
 
   async function call(path: string, body?: object) {
     setBusy(true);
@@ -31,12 +42,29 @@ export function CaseActions({
   }
 
   if (!canAct) return null;
+  const hint = (d: string) =>
+    suggest && agentDecision === d
+      ? { outline: "2px solid var(--accent)", outlineOffset: 2 }
+      : {};
   return (
     <div
       className="card"
       style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}
     >
       <strong>Actions</strong>
+      {suggest && (
+        <div
+          className="card"
+          style={{
+            padding: 8,
+            borderColor: "var(--accent)",
+            fontSize: 13,
+          }}
+        >
+          ★ Agent suggests <strong>{agentDecision}</strong> — note pre-filled
+          below. Confirm it or override.
+        </div>
+      )}
       <button
         className="btn secondary"
         disabled={busy}
@@ -54,6 +82,7 @@ export function CaseActions({
       <div style={{ display: "flex", gap: 8 }}>
         <button
           className="btn"
+          style={hint("approve")}
           disabled={busy || done}
           onClick={() => call("decide", { decision: "approve", note })}
         >
@@ -61,7 +90,7 @@ export function CaseActions({
         </button>
         <button
           className="btn"
-          style={{ background: "#e5534b", color: "#fff" }}
+          style={{ background: "#e5534b", color: "#fff", ...hint("deny") }}
           disabled={busy || done}
           onClick={() => {
             if (confirm("Confirm denial? This is the human confirm step."))

@@ -1,9 +1,11 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 export default async function Appeals() {
   const session = await auth();
+  if (!session) redirect("/");
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const rows = await fetch(`${BACKEND}/appeals`, {
     headers: { authorization: `Bearer ${token}` },

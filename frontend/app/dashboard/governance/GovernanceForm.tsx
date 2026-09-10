@@ -6,10 +6,12 @@ export function GovernanceForm({ flag }: { flag: Record<string, unknown> }) {
   const router = useRouter();
   const [f, setF] = useState(flag);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   async function save() {
     setBusy(true);
-    await fetch("/api/rg/dashboard/governance", {
+    setErr("");
+    const res = await fetch("/api/rg/dashboard/governance", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -22,6 +24,11 @@ export function GovernanceForm({ flag }: { flag: Record<string, unknown> }) {
       }),
     });
     setBusy(false);
+    if (!res.ok) {
+      // a governance control must never fail silently
+      setErr(`save failed — ${res.status}: ${await res.text()}`);
+      return;
+    }
     router.refresh();
   }
 
@@ -88,6 +95,9 @@ export function GovernanceForm({ flag }: { flag: Record<string, unknown> }) {
       <button className="btn" disabled={busy} onClick={save}>
         Save
       </button>
+      {err && (
+        <div style={{ color: "#ff8a8a", flexBasis: "100%" }}>{err}</div>
+      )}
     </div>
   );
 }

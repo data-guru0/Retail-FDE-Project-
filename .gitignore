@@ -81,6 +81,8 @@ scripts/_dlq_worker*.log
 docker-compose.dlqtest.yml
 # written by scripts/mcp_setup.py (ContextForge virtual-server ids for reference):
 scenarios/mcp_setup.json
+# local review artifact from seed/fetch_images.py (the product images themselves ARE committed):
+seed/images/_contact_sheet.png
 
 # ---- Docker nested-bind-mount mountpoints ---------------------------------
 # docker-compose.override.yml mounts ./docs, ./seed, ./ml, ./scenarios INSIDE

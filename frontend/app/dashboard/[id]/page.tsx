@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { CaseActions } from "./CaseActions";
 import { LiveTrace } from "./LiveTrace";
@@ -11,6 +12,7 @@ export default async function CaseDetail({
 }) {
   const { id } = await params;
   const session = await auth();
+  if (!session) redirect("/");
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const roles = (session?.user as unknown as { roles?: string[] })?.roles ?? [];
   const data = await fetch(`${BACKEND}/dashboard/returns/${id}`, {
@@ -91,6 +93,9 @@ export default async function CaseDetail({
           id={id}
           canAct={roles.includes("reviewer") || roles.includes("admin")}
           status={r.status}
+          level={data.automation_level}
+          agentDecision={r.decision}
+          agentReason={r.decision_reason}
         />
         <h2 style={{ fontWeight: 600 }}>Live trace</h2>
         <LiveTrace id={id} initial={data.events} />

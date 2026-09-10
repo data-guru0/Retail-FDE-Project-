@@ -100,9 +100,14 @@ async def case_detail(rid: str, p: Principal = Depends(reviewer),
         {"r": rid})).mappings().all()
     photos = (await session.execute(text(
         "SELECT object_key FROM return_photos WHERE return_id=:r"), {"r": rid})).scalars().all()
+    # current operating mode — in `suggest` the reviewer's screen is pre-filled
+    # with the agent's proposal (see CaseActions.tsx)
+    level = (await session.execute(text(
+        "SELECT automation_level FROM feature_flags WHERE scope='global'"))).scalar_one_or_none()
     from app.services import storage
     return {
         "return": {k: (str(v) if isinstance(v, dt.datetime) else v) for k, v in dict(r).items()},
+        "automation_level": level,
         "agent_runs": [dict(x) for x in runs],
         "events": [dict(x) for x in events],
         "photo_urls": [storage.presigned_get(k) for k in photos],

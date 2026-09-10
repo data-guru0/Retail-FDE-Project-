@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
@@ -12,6 +13,7 @@ function J({ v }: { v: unknown }) {
 
 export default async function Analytics() {
   const session = await auth();
+  if (!session) redirect("/");
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const h = { authorization: `Bearer ${token}` };
   const [a, health, rings] = await Promise.all([

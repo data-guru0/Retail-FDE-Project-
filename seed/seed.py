@@ -1,11 +1,12 @@
-"""Seed real products: download a real photo per product, re-encode it, store it
-in MinIO, insert the product row. Idempotent (upsert by SKU). Also writes the
-baseline policy docs (M4 embeds them into Qdrant).
+"""Seed real products: store a real photo per product in MinIO, insert the
+product row. Idempotent (upsert by SKU). Also writes the baseline policy docs
+(M4 embeds them into Qdrant).
 
 Run: `make seed`  (docker compose run --rm backend python -m seed.seed)
 
-ponytail: product photos come from picsum.photos (real photographs, deterministic
-per-SKU seed). Swap `image_url` in products.json for true catalog shots if needed.
+Product photos: a real, on-topic image per SKU lives in `seed/images/<SKU>.jpg`
+(committed — fetched once from Openverse by `seed/fetch_images.py`, CC-licensed).
+If a SKU has no local file we fall back to downloading its `image_url`.
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from app.services import storage
 
 HERE = pathlib.Path(__file__).parent
 PRODUCTS = json.loads((HERE / "products.json").read_text())
+IMAGES_DIR = HERE / "images"
 
 POLICY_DOCS = [
     (
@@ -68,18 +70,25 @@ POLICY_DOCS = [
 MAX_DIM = 900
 
 
-async def _fetch_image(url: str) -> bytes:
+def _encode(raw: bytes) -> bytes:
+    img = Image.open(io.BytesIO(raw))
+    img.load()
+    img.thumbnail((MAX_DIM, MAX_DIM))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=85)
+    return out.getvalue()
+
+
+async def _image_bytes(sku: str, url: str) -> bytes:
+    local = IMAGES_DIR / f"{sku}.jpg"
+    if local.is_file():
+        return _encode(local.read_bytes())
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
         r = await c.get(url)
         r.raise_for_status()
-        img = Image.open(io.BytesIO(r.content))
-        img.load()
-        img.thumbnail((MAX_DIM, MAX_DIM))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        out = io.BytesIO()
-        img.save(out, format="JPEG", quality=85)
-        return out.getvalue()
+        return _encode(r.content)
 
 
 async def seed_products() -> int:
@@ -88,7 +97,7 @@ async def seed_products() -> int:
         for p in PRODUCTS:
             key = f"products/{p['sku']}.jpg"
             if not storage.exists(key):
-                data = await _fetch_image(p["image_url"])
+                data = await _image_bytes(p["sku"], p["image_url"])
                 storage.put_bytes(key, data, "image/jpeg")
             stmt = insert(Product).values(
                 sku=p["sku"], name=p["name"], description=p["description"],

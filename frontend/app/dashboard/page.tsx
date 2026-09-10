@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
@@ -23,6 +24,7 @@ export default async function Queue({
   const sp = await searchParams;
   const status = sp.status ?? "escalated";
   const session = await auth();
+  if (!session) redirect("/");
   const token = (session as unknown as { accessToken?: string }).accessToken;
   const rows: Row[] = await fetch(
     `${BACKEND}/dashboard/queue?status=${status}`,
