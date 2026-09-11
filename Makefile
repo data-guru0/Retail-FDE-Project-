@@ -40,14 +40,8 @@ vault-init: ## re-run the vault bootstrap
 opa-test: ## run the OPA policy unit tests (infra/opa/*_test.rego)
 	$(COMPOSE) exec -T opa /opa test /policies -v
 
-smoke: ## run every verify script + scenarios
+smoke: ## run every verify script
 	python scripts/smoke.py
-
-scenarios: ## run the scenario catalog against the live system
-	python scripts/run_scenarios.py
-
-demo: ## seed + walk the [demo] scenarios
-	python scripts/run_scenarios.py --demo
 
 dataset: ## generate the synthetic ML dataset
 	$(COMPOSE) run --rm worker python -m ml.generate_dataset
@@ -86,4 +80,4 @@ backup: ## pg_dump + qdrant snapshot + minio mirror
 restore: ## restore from backups/
 	@bash scripts/restore.sh
 
-.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init opa-test smoke scenarios demo dataset train loadtest backup restore reembed-policy sync-prompts replay reprocess mcp-setup bifrost-setup m4-setup
+.PHONY: help preflight up up-lite down nuke logs migrate makemigration seed vault-init opa-test smoke dataset train loadtest backup restore reembed-policy sync-prompts replay reprocess mcp-setup bifrost-setup m4-setup

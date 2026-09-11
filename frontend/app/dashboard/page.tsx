@@ -16,6 +16,23 @@ type Row = {
   item: string;
 };
 
+function decisionBadge(decision: string | null) {
+  const cls =
+    decision === "approve"
+      ? "ok"
+      : decision === "deny"
+        ? "danger"
+        : decision === "escalate"
+          ? "warn"
+          : "";
+  return (
+    <span className={`d-badge ${cls}`}>
+      <span className="dot" />
+      {decision ?? "—"}
+    </span>
+  );
+}
+
 export default async function Queue({
   searchParams,
 }: {
@@ -38,68 +55,76 @@ export default async function Queue({
   const renderedAt = Date.now();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="d-head">
+        <h1>Queue</h1>
+      </div>
+      <div className="d-tabs">
         {["escalated", "in_review", "info_requested", "approved", "denied"].map(
           (s) => (
             <Link
               key={s}
               href={`/dashboard?status=${s}`}
-              className="btn secondary"
-              style={{
-                borderColor: s === status ? "var(--accent)" : "var(--border)",
-              }}
+              className={`d-tab${s === status ? " active" : ""}`}
             >
-              {s}
+              {s.replace("_", " ")}
             </Link>
           ),
         )}
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr className="muted" style={{ textAlign: "left", fontSize: 13 }}>
-            <th style={{ padding: 8 }}>Case</th>
-            <th>Item</th>
-            <th>Reason</th>
-            <th>Amount</th>
-            <th>Agent</th>
-            <th>Age</th>
-            <th>Claimed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} style={{ borderTop: "1px solid var(--border)" }}>
-              <td style={{ padding: 8 }}>
-                <Link
-                  href={`/dashboard/${r.id}`}
-                  style={{ color: "var(--accent)" }}
-                >
-                  #{r.id.slice(0, 8)}
-                </Link>
-              </td>
-              <td>{r.item}</td>
-              <td>{r.reason_code}</td>
-              <td>${r.amount}</td>
-              <td>{r.decision ?? "—"}</td>
-              <td className="muted">
-                {Math.round(
-                  (renderedAt - new Date(r.created_at).getTime()) / 60000,
-                )}
-                m
-              </td>
-              <td className="muted">{r.claimed_by ? "yes" : "—"}</td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
+      <div className="d-section" style={{ padding: 0 }}>
+        <table className="d-table">
+          <thead>
             <tr>
-              <td colSpan={7} className="muted" style={{ padding: 16 }}>
-                nothing in {status}
-              </td>
+              <th style={{ paddingLeft: 16 }}>Case</th>
+              <th>Item</th>
+              <th>Reason</th>
+              <th>Amount</th>
+              <th>Agent</th>
+              <th>Age</th>
+              <th style={{ paddingRight: 16 }}>Claimed</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td className="d-mono" style={{ paddingLeft: 16 }}>
+                  <Link href={`/dashboard/${r.id}`} style={{ color: "var(--accent)" }}>
+                    #{r.id.slice(0, 8)}
+                  </Link>
+                </td>
+                <td>{r.item}</td>
+                <td className="muted">{r.reason_code}</td>
+                <td className="num">${r.amount}</td>
+                <td>{decisionBadge(r.decision)}</td>
+                <td className="muted num">
+                  {Math.round(
+                    (renderedAt - new Date(r.created_at).getTime()) / 60000,
+                  )}
+                  m
+                </td>
+                <td className="muted" style={{ paddingRight: 16 }}>
+                  {r.claimed_by ? (
+                    <span className="d-badge info">
+                      <span className="dot" />
+                      claimed
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="d-empty">nothing in {status.replace("_", " ")}</div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

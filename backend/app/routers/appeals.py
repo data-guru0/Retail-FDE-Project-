@@ -85,10 +85,11 @@ async def resolve_appeal(appeal_id: str, outcome: str, p: Principal = Depends(re
         raise HTTPException(403, "this appeal is assigned to a different reviewer")
 
     new_status = "approved" if outcome == "approve" else "denied"
+    refund = "pending" if outcome == "approve" else "none"
     await session.execute(text(
         "UPDATE returns SET status=:s, final_decision=:o, decided_by=:rev, decided_at=now(), "
-        "refund_state=CASE WHEN :o='approve' THEN 'pending' ELSE 'none' END WHERE id=:r"),
-        {"s": new_status, "o": outcome, "rev": p.reviewer_id, "r": a["return_id"]})
+        "refund_state=:rf WHERE id=:r"),
+        {"s": new_status, "o": outcome, "rf": refund, "rev": p.reviewer_id, "r": a["return_id"]})
     await session.execute(text(
         "UPDATE appeals SET status='resolved', outcome=:o, resolved_at=now() WHERE id=:a"),
         {"o": outcome, "a": appeal_id})

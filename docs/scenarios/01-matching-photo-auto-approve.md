@@ -1,82 +1,98 @@
 # Scenario 01 — Matching photo → auto-approved
 
-**Route:** auto-approve **· Automated by:** `python scripts/run_scenarios.py A0` **· Group:** decision behaviour **· [demo]**
+**Route:** auto-approve · **Group:** decision behaviour · **[demo]**
+
+New here? Read [00 — Watching a case live](00-watching-a-case-live.md) first —
+it explains the Live Trace, Langfuse, MinIO, Grafana and alerts panels this
+walkthrough points at.
 
 ## What this shows
 
 A clean, in-policy return with a photo that genuinely matches the product is
-cleared by the system in seconds — through a *real* image check, not a bypass —
-and a copy still lands in the human queue for quality control.
+cleared by the system in seconds — through a *real* CLIP image comparison, not
+a shortcut — and a copy still lands in the human queue for quality control.
+This is the "everything goes right" case: it's the baseline every other
+walkthrough contrasts against.
 
 ## The situation
 
-An established customer (12 past orders, 0 returns) bought a **Terra Ceramic Mug
-Set (RG-009, $32)**. Three days after delivery one mug arrives cracked. They open
-a return, reason "damaged", and upload a photo. The photo *is* the real catalog
-image of that mug set. The store is running at automation level **`assist`**.
+A regular customer (several past orders, no prior returns) bought the **Terra
+Ceramic Mug Set (RG-009, $32)**. A few days after delivery, one mug arrives
+cracked. They open a return, pick reason **Damaged**, and upload a real photo
+of the mug set.
 
-## Run it
+## Before you start
 
-```bash
-# from the repo root, stack already up (make up + make migrate + make seed + make m4-setup)
-python scripts/run_scenarios.py A0
-```
+Log in to the dashboard as `admin1@returnguard.local` / `admin1`, go to
+**Governance**, and set the **global** row's **Automation level** to `assist`,
+then **Save**. (If you've just done the [automation ladder](12-automation-level-ladder.md)
+walkthrough it may already be there.)
 
-Or by hand in the shop (http://localhost:3000):
+## Walkthrough (as the customer)
 
-1. Register / log in as a customer, buy the **Terra Ceramic Mug Set**.
-2. Orders → that order → **Return item** → reason **Damaged**, note "one mug
-   cracked", upload `scenarios/fixtures/matching_RG-009.jpg`, submit.
-3. As `admin1@returnguard.local` set **Governance → global → level = assist**
-   first.
+1. Go to `http://localhost:3000`, click **Sign in** (register a new account
+   from Keycloak's login page if you don't have one).
+2. Find the **Terra Ceramic Mug Set (4)** in the shop grid, open it, and click
+   **Add to cart** — you'll land on the cart page.
+3. Click **Checkout**, fill in an address and city/ZIP, leave the pre-filled
+   test card as-is, and click **Pay $32.00**.
+4. Go to **My orders**, open the order you just placed, and click
+   **Return this** next to the mug set line.
+5. Step 1: reason **damaged** → **Next**. Step 2: type something like "one mug
+   arrived with a crack across the base" → **Next**. Step 3: upload a real
+   photo of the item (a photo of the actual mugs, or the product photo you can
+   save from the shop listing) → **Submit return**.
+6. You land on `/returns/<id>` — note the id in the URL, then switch to the
+   dashboard.
 
-## What happens, step by step
+## What happens behind the scenes
 
-Open the case in the dashboard (`/dashboard/<id>`) and watch the **Live trace**
-fill in over the WebSocket:
+Real numbers from a live run of exactly this case:
 
-| # | Node | What it does here | What you see |
-|---|---|---|---|
-| 1 | **data_quality** | reason needs a photo → a photo is present; product has a reference image | `node_end` `ok=true` |
-| 2 | **planner** | a return photo *and* a reference image exist → keeps `image` in the plan | plan = `[intake, policy, image, behavior, decision, critic, explanation]` |
-| 3 | **intake** | calls `get_order` **through ContextForge** → order total, item, dates | `tool_call` `tool=get_order via=contextforge ok=true` |
-| 4 | **policy** | embeds the request, retrieves the return-window + Home&Kitchen rules from Qdrant, calls `check_policy` → **eligible**, records `policy_version` | `rag` event with the hits; `agent_runs.policy_version` set |
-| 5 | **image** | CLIP similarity between the upload and the catalog photo ≈ **0.99** (match); AI-image detector score low | `clip_similarity ≈ 0.99`, `ai_generated_score` low |
-| 6 | **behavior** | scikit-learn risk model on the tabular features → risk ≈ **0.05**; `get_customer_history` + `flag_ring` via ContextForge → no linked accounts | `risk_score ≈ 0.05`, `ring_accounts = []` |
-| 7 | **decision** | combines: policy-eligible + photo match + low risk → **approve**, confidence ≈ 0.9 | `decision = approve` |
-| 8 | **critic** | reviews the Decision's reasoning — policy eligible, image matches, low risk, no ring → **nothing to veto** | `veto = false` |
-| 9 | **explanation** | writes the plain-English reason stored for the customer + audit | text saved |
-| 10 | **GovernanceGate** | `risk 0.05 < tau_risk` **and** `confidence 0.90 > tau_conf` **and** no veto **and** not high-value **and** `level = assist` → **auto_approve**. Then rolls `qa_sample_pct` → a QA sample row is written | `route = auto_approve`; `node_end` reason string |
+| Agent | What it did | Real result |
+|---|---|---|
+| **data_quality** | checked a photo was required and present | `ok: true` |
+| **planner** | decided which checks this case needs | full plan: intake, policy, image, behavior, decision, critic, explanation |
+| **intake** | called `get_order` via ContextForge, checked the request is coherent | `complete: true`, confidence 0.99 |
+| **policy** | retrieved the return-window, condition, and category rules from Qdrant | `eligible: yes`, citing `return-window`, `condition-rules`, `category-exceptions` |
+| **image** | ran real CLIP similarity between the upload and the catalog photo, plus the AI-image detector | `clip_similarity: 0.998` (match), `ai_generated_score: 0.016` (real photo) |
+| **behavior** | scored the account's real order/return history via `get_customer_history` | `risk_score: 0.08`, `return_rate: 0.077` |
+| **decision** | combined all signals | `decision: approve`, confidence 0.92 |
+| **critic** | reviewed the Decision agent's reasoning | `veto: false, agree: true` |
+| **explanation** | wrote the customer-facing reason | saved |
+| **GovernanceGate** | risk 0.08 < τ_risk, confidence 0.92 > τ_conf, no veto, level allows it | **`auto_approve`**, and rolled the QA sample die |
 
-## What to check afterwards
+## In the reviewer dashboard
 
-```bash
-# the return is approved with a pending refund
-docker compose exec -T postgres psql -U returnguard -d returnguard -c \
- "select status, decision, final_decision, refund_state from returns order by created_at desc limit 1;"
-#  status=approved | decision=approve | final_decision=approve | refund_state=pending
+Open `/dashboard/<id>`. **Status**, **Agent proposed**, and **Final** all show
+green **approved** / **approve** badges. The **Actions** panel is gone —
+there's nothing left for a human to do. A few minutes later the `Return #`
+row in **My returns** (customer side) shows stage **refunded** — the
+`process_refunds` worker cron moved it from `pending` to `refunded` and sent
+an email, without anyone clicking anything.
 
-# the Governance Gate is the finalizer, and it's in the append-only audit log
-docker compose exec -T postgres psql -U returnguard -d returnguard -c \
- "select actor_id, action from audit_log order by id desc limit 3;"
-#  governance_gate | auto_approve
+## Watch it live
 
-# a QA sample landed in the human queue
-docker compose exec -T postgres psql -U returnguard -d returnguard -c \
- "select kind, agent_decision from agreement_samples order by id desc limit 1;"
-#  qa_sample | approve
-```
+- **Live Trace:** a full `pipeline_start` → node events → `pipeline_end`
+  sequence ending with `route: auto_approve` — no human ever appears in it.
+- **Langfuse:** six generations for this one case (planner, intake, policy,
+  behavior's LLM read, decision, critic, explanation minus data_quality/image/
+  behavior's local model) — every one under a cent.
+- **MinIO:** `returnguard` bucket → `returns/<id>/<file>.jpg` — the photo you
+  just uploaded, EXIF-stripped.
+- **Analytics page:** **hours saved** and **dollars saved** tick up by one
+  case; the **auto-approved** bar under Quality grows by one.
+- **Alerts:** none of the four fire here — this is the "everything is fine"
+  baseline the alerts are watching *against*.
 
-- **Dashboard → Analytics:** `hours saved` / `$ saved` tick up.
-- **Langfuse (http://localhost:3001):** the trace for this run has a GENERATION
-  observation per LLM node with real tokens + cost.
-- The refund itself is **not** issued by the pipeline — the `process_refunds`
-  worker cron moves `refund_state pending → refunded` and emails the customer.
+Even at `assist`, an admin can dial `qa_sample_pct` up (we used 100% while
+testing this ourselves) so a share of auto-approvals still get a human's eyes
+— check **agreement_samples** growth on the Analytics agreement trend.
 
 ## Why it matters
 
-Autonomy is safe *because it is bounded*. This auto-approved only because every
-one of five gates passed — risk < τ, confidence > τ, no Critic veto, not
-high-value, and an admin had set the level. Flip any one and it goes to a human.
-The image check was real CLIP inference on the actual pixels, not a rule that
-trusts the upload.
+Autonomy is safe *because it's bounded*. This case only auto-approved because
+every one of several independent gates passed: policy-eligible, a real image
+match, low behavioural risk, no Critic veto, and an admin had explicitly
+turned automation on. Flip any single one of those and the exact same case
+goes to a human instead — see the next few walkthroughs.

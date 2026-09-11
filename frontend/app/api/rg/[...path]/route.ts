@@ -36,6 +36,9 @@ export async function GET(req: Request, ctx: Ctx) {
 export async function POST(req: Request, ctx: Ctx) {
   return proxy(req, (await ctx.params).path);
 }
+export async function PUT(req: Request, ctx: Ctx) {
+  return proxy(req, (await ctx.params).path);
+}
 export async function PATCH(req: Request, ctx: Ctx) {
   return proxy(req, (await ctx.params).path);
 }

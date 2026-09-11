@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy.exc import DataError
 
 from app import telemetry
 from app.logging import configure, log
@@ -30,6 +32,15 @@ app = FastAPI(title="ReturnGuard API", version="0.1.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+@app.exception_handler(DataError)
+async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
+    # every {id} route casts a raw path segment straight to a Postgres uuid — a
+    # malformed id (typo, bad link, bot probing) must 404, not leak a 500 + a
+    # SQL trace. Real ids never hit this path.
+    log.warning("request.malformed_id", path=request.url.path)
+    return JSONResponse(status_code=404, content={"detail": "not found"})
 
 # correlation-id + Prometheus (+ /metrics), both via standard libs
 telemetry.setup(app)

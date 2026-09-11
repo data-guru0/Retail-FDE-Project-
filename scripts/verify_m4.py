@@ -22,7 +22,7 @@ import uuid
 from _kc import register_user, token
 from _rg import API, Check, httpx, q1, qall
 
-FIX = pathlib.Path(__file__).resolve().parents[1] / "scenarios" / "fixtures" / "mug_photo.jpg"
+FIX = pathlib.Path(__file__).resolve().parents[1] / "docs" / "scenarios" / "assets" / "mug_photo.jpg"
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -155,7 +155,7 @@ def _cf_jwt() -> str:
 
 
 def _check_contextforge(c: Check) -> None:
-    setup = ROOT / "scenarios" / "mcp_setup.json"
+    setup = ROOT / "infra" / "mcp-gateway" / "mcp_setup.json"
     if not setup.exists():
         print("  (ContextForge not configured — run scripts/mcp_setup.py — skipping)")
         return

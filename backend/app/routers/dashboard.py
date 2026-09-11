@@ -104,6 +104,12 @@ async def case_detail(rid: str, p: Principal = Depends(reviewer),
     # with the agent's proposal (see CaseActions.tsx)
     level = (await session.execute(text(
         "SELECT automation_level FROM feature_flags WHERE scope='global'"))).scalar_one_or_none()
+    # the "request info" round trip (dashboard.request_info -> customer answers via
+    # returns.answer_info_request) — without this the reviewer who asked the
+    # question has no way to ever see the customer's answer
+    info_requests = (await session.execute(text(
+        "SELECT question, answer, created_at, answered_at FROM info_requests "
+        "WHERE return_id=:r ORDER BY created_at"), {"r": rid})).mappings().all()
     from app.services import storage
     return {
         "return": {k: (str(v) if isinstance(v, dt.datetime) else v) for k, v in dict(r).items()},
@@ -111,6 +117,8 @@ async def case_detail(rid: str, p: Principal = Depends(reviewer),
         "agent_runs": [dict(x) for x in runs],
         "events": [dict(x) for x in events],
         "photo_urls": [storage.presigned_get(k) for k in photos],
+        "info_requests": [{k: (v.isoformat() if isinstance(v, dt.datetime) else v)
+                           for k, v in dict(x).items()} for x in info_requests],
     }
 
 

@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { ResolveAppeal } from "./ResolveAppeal";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -13,13 +15,15 @@ export default async function Appeals() {
   }).then((r) => r.json());
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700 }}>Appeals</h1>
-      <p className="muted">
-        A denied return can be contested. The appeal routes to a reviewer who is
-        not the one who decided it (conflict-of-interest guard).
-      </p>
-      {rows.length === 0 && <p className="muted">no appeals</p>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="d-head">
+        <h1>Appeals</h1>
+        <p>
+          A denied return can be contested. The appeal routes to a reviewer who
+          is not the one who decided it (conflict-of-interest guard).
+        </p>
+      </div>
+      {rows.length === 0 && <div className="d-empty">no appeals</div>}
       {rows.map(
         (a: {
           id: string;
@@ -30,16 +34,34 @@ export default async function Appeals() {
           original_reviewer: string | null;
           outcome: string | null;
         }) => (
-          <div key={a.id} className="card" style={{ padding: 14 }}>
-            <div>
-              <strong>Return #{a.return_id.slice(0, 8)}</strong> · {a.status}
-              {a.outcome ? ` · ${a.outcome}` : ""}
+          <div key={a.id} className="d-section">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Link href={`/dashboard/${a.return_id}`} style={{ color: "var(--accent)" }}>
+                <strong>Return #{a.return_id.slice(0, 8)}</strong>
+              </Link>
+              <span className="d-badge info">
+                <span className="dot" />
+                {a.status}
+              </span>
+              {a.outcome && (
+                <span
+                  className={`d-badge ${a.outcome === "approve" ? "ok" : "danger"}`}
+                >
+                  <span className="dot" />
+                  {a.outcome}
+                </span>
+              )}
             </div>
-            <div className="muted">{a.reason}</div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              assigned: {a.assigned_to?.slice(0, 8) ?? "—"} · COI-excluded:{" "}
-              {a.original_reviewer?.slice(0, 8) ?? "—"}
+            <div className="muted" style={{ fontSize: 13.5 }}>{a.reason}</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="d-chip">
+                assigned: {a.assigned_to?.slice(0, 8) ?? "—"}
+              </span>
+              <span className="d-chip">
+                COI-excluded: {a.original_reviewer?.slice(0, 8) ?? "—"}
+              </span>
             </div>
+            {a.status !== "resolved" && <ResolveAppeal id={a.id} />}
           </div>
         ),
       )}

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db import get_session
-from app.models import Order, OrderItem, Outbox, Return, ReturnPhoto
+from app.models import OrderItem, Outbox, Return, ReturnPhoto
 from app.ratelimit import limiter
 from app.schemas import ReturnCreateOut, ReturnOut
 from app.security import Principal, current_user

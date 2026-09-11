@@ -17,7 +17,7 @@ import uuid
 from _kc import register_user, token
 from _rg import API, BIFROST, Check, httpx, q1, qall
 
-FIX = pathlib.Path(__file__).resolve().parents[1] / "scenarios" / "fixtures" / "sample_return.jpg"
+FIX = pathlib.Path(__file__).resolve().parents[1] / "docs" / "scenarios" / "assets" / "sample_return.jpg"
 LANGFUSE_PK = None
 
 

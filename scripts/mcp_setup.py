@@ -4,7 +4,7 @@
    federates its tools)
 2. create one **virtual server per agent** exposing only that agent's allowed
    tools (least privilege — CLAUDE.md)
-3. write the per-agent server ids to scenarios/mcp_setup.json and to Vault
+3. write the per-agent server ids to infra/mcp-gateway/mcp_setup.json and to Vault
 
 Least-privilege map:
   intake   -> get_order
@@ -30,7 +30,7 @@ from _rg import _E, httpx
 GW = "http://localhost:4444"
 UPSTREAM = "http://mcp-server:8070/mcp/"
 JWT_SECRET = _E["CONTEXTFORGE_JWT_SECRET"]
-OUT = pathlib.Path(__file__).resolve().parents[1] / "scenarios" / "mcp_setup.json"
+OUT = pathlib.Path(__file__).resolve().parents[1] / "infra" / "mcp-gateway" / "mcp_setup.json"
 
 ALLOW = {
     "intake": ["get_order"],

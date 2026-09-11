@@ -30,11 +30,15 @@ export function PolicyEditor({ docs }: { docs: Doc[] }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div className="muted">current version: {docs[0]?.version}</div>
+      <div className="d-version">current version: {docs[0]?.version}</div>
       {docs.map((d) => (
-        <div key={d.slug} className="card" style={{ padding: 12 }}>
+        <div key={d.slug} className="d-section">
+          <div className="d-doc-head">
+            <span className="d-chip">{d.slug}</span>
+          </div>
           <input
             className="input"
+            style={{ fontWeight: 600 }}
             value={edits[d.slug].title}
             onChange={(e) =>
               setEdits({
@@ -46,7 +50,6 @@ export function PolicyEditor({ docs }: { docs: Doc[] }) {
           <textarea
             className="input"
             rows={5}
-            style={{ marginTop: 8 }}
             value={edits[d.slug].body}
             onChange={(e) =>
               setEdits({
@@ -60,7 +63,7 @@ export function PolicyEditor({ docs }: { docs: Doc[] }) {
       <button className="btn" disabled={busy} onClick={save}>
         Save new version + re-embed
       </button>
-      {msg && <div className="muted">{msg}</div>}
+      {msg && <div className="d-toast">{msg}</div>}
     </div>
   );
 }

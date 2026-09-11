@@ -1,5 +1,7 @@
-"""Run every verify_* + the scenario catalog + the audit-chain + security checks.
-`make smoke`.
+"""Run every verify_* + the audit-chain + security checks. `make smoke`.
+
+The scenario catalog itself (docs/scenarios/*.md) is a manual, click-through
+walkthrough for demos, not an automated check — see docs/scenarios/README.md.
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ CHECKS = [
     "verify_m1.py", "verify_m2.py", "verify_m2_frontend.py",
     "verify_m3.py", "verify_m3_dlq.py",
     "verify_m4.py", "verify_audit_chain.py",
-    "run_scenarios.py", "verify_security.py", "verify_m5.py",
+    "verify_security.py", "verify_m5.py",
     "verify_m6.py",
 ]
 

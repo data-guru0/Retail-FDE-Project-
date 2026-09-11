@@ -11,7 +11,6 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,

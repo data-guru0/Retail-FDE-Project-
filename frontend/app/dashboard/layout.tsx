@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import "./dashboard.css";
 
 export default async function DashboardLayout({
   children,
@@ -14,24 +15,18 @@ export default async function DashboardLayout({
   }
   const admin = roles.includes("admin");
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <nav style={{ display: "flex", gap: 12 }}>
-        <Link href="/dashboard" className="btn secondary">
-          Queue
-        </Link>
-        <Link href="/dashboard/analytics" className="btn secondary">
-          Analytics
-        </Link>
-        <Link href="/dashboard/appeals" className="btn secondary">
-          Appeals
-        </Link>
+    <div className="d-shell">
+      <nav className="d-nav">
+        <Link href="/dashboard">Queue</Link>
+        <Link href="/dashboard/analytics">Analytics</Link>
+        <Link href="/dashboard/appeals">Appeals</Link>
         {admin && (
-          <Link href="/dashboard/governance" className="btn secondary">
+          <Link href="/dashboard/governance" className="admin">
             Governance
           </Link>
         )}
         {admin && (
-          <Link href="/dashboard/policy" className="btn secondary">
+          <Link href="/dashboard/policy" className="admin">
             Policy
           </Link>
         )}

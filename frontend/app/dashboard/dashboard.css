@@ -1,0 +1,417 @@
+/* Reviewer/admin dashboard only — imported from app/dashboard/layout.tsx so it
+   never reaches /shop, /returns, /orders, or /checkout. Additive: reuses the
+   existing --bg/--card/--border/--text/--muted/--accent tokens from
+   globals.css, only adds new "d-" prefixed classes + status colors so it
+   can't collide with or override any shop styling. */
+
+:root {
+  --ok: #34c98f;
+  --ok-bg: rgba(52, 201, 143, 0.12);
+  --warn: #f0b429;
+  --warn-bg: rgba(240, 180, 41, 0.12);
+  --danger: #ef6461;
+  --danger-bg: rgba(239, 100, 97, 0.14);
+  --info: #6ea8fe;
+  --info-bg: rgba(110, 168, 254, 0.12);
+  --neutral-bg: rgba(154, 161, 173, 0.12);
+}
+
+.d-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* top section nav (Queue / Analytics / Appeals / Governance / Policy) */
+.d-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  width: fit-content;
+}
+.d-nav a {
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.d-nav a:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+.d-nav a.admin {
+  color: var(--warn);
+}
+
+/* page heading */
+.d-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.d-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+.d-head p {
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 72ch;
+  line-height: 1.5;
+}
+
+.d-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.d-section > h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* status/role/decision pills */
+.d-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--neutral-bg);
+  color: var(--muted);
+}
+.d-badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.d-badge.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.d-badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.d-badge.info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.d-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* tab pills (Queue status filter) */
+.d-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.d-tab {
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card);
+  text-transform: capitalize;
+}
+.d-tab:hover {
+  color: var(--text);
+}
+.d-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--info-bg);
+}
+
+/* tables */
+.d-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.d-table th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 10px 10px;
+  font-weight: 700;
+}
+.d-table td {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+.d-table tbody tr {
+  transition: background 0.12s ease;
+}
+.d-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+.d-table .num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* case id / mono chips */
+.d-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+.d-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.4rem;
+  background: var(--neutral-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* key/value summary rows (case header) */
+.d-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px 20px;
+}
+.d-kv-grid > div {
+  min-width: 0; /* grid items refuse to shrink below content width by default */
+}
+.d-kv-grid .k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.d-kv-grid .v {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere; /* long unbroken values (emails, ids) must not bleed past their cell */
+  min-width: 0;
+}
+
+/* stat tiles (analytics) */
+.d-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.d-stat {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 10px 12px;
+}
+.d-stat .v {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.d-stat .l {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* horizontal bar rows (cost per model, proportions) */
+.d-bar-row {
+  display: grid;
+  grid-template-columns: 1fr 2.2fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.d-bar-row .name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.d-bar-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.d-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.d-bar-row .val {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.d-empty {
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 18px 4px;
+  text-align: center;
+}
+
+/* live trace timeline */
+.d-trace {
+  display: flex;
+  flex-direction: column;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.d-trace-item {
+  display: flex;
+  gap: 10px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--border);
+}
+.d-trace-item:first-child {
+  border-top: none;
+}
+.d-trace-dot {
+  margin-top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.d-trace-dot.node_start,
+.d-trace-dot.node_end {
+  background: var(--info);
+}
+.d-trace-dot.tool_call {
+  background: var(--warn);
+}
+.d-trace-dot.pipeline_start,
+.d-trace-dot.pipeline_end {
+  background: var(--ok);
+}
+.d-trace-body {
+  flex: 1;
+  min-width: 0;
+}
+.d-trace-head {
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.d-trace pre {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-x: auto;
+}
+
+/* case actions panel */
+.d-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.d-suggest {
+  border: 1px solid var(--accent);
+  background: var(--info-bg);
+  color: var(--text);
+  border-radius: 0.6rem;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.d-actions-row {
+  display: flex;
+  gap: 8px;
+}
+.d-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+.d-toast {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+/* agent reasoning */
+.d-agent {
+  padding: 12px 14px;
+}
+.d-agent > summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.d-agent > summary::-webkit-details-marker {
+  display: none;
+}
+.d-agent pre {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  overflow-x: auto;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  padding: 8px 10px;
+}
+
+/* governance form */
+.d-gov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, auto));
+  gap: 14px 22px;
+  align-items: end;
+}
+.d-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.d-field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.d-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+/* policy editor */
+.d-doc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.d-version {
+  font-size: 12px;
+  color: var(--muted);
+}

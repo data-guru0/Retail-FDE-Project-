@@ -18,7 +18,7 @@ import uuid
 from _kc import register_user, token
 from _rg import API, httpx, q1
 
-PHOTO = pathlib.Path(__file__).resolve().parents[1] / "scenarios" / "fixtures" / "sample_return.jpg"
+PHOTO = pathlib.Path(__file__).resolve().parents[1] / "docs" / "scenarios" / "assets" / "sample_return.jpg"
 
 
 def one(_: int) -> float:

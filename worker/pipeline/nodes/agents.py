@@ -10,7 +10,7 @@ import time
 
 import structlog
 
-from pipeline import audit, db, mcp_client
+from pipeline import audit, mcp_client
 from pipeline.nodes.base import RunCtx, record_local_agent, run_llm_agent
 
 log = structlog.get_logger()
@@ -54,7 +54,7 @@ def _facts(ctx: dict) -> dict:
     age_days = None
     if ctx.get("age_since_order") is not None:
         age_days = round(ctx["age_since_order"].total_seconds() / 86400, 1)
-    return {
+    facts = {
         "item_name": ctx["item_name"],
         "category": ctx["category"],
         "product_description": (ctx.get("product_description") or "")[:400],
@@ -67,6 +67,15 @@ def _facts(ctx: dict) -> dict:
         "customer_lifetime_orders": ctx["user_order_count"],
         "customer_lifetime_returns": ctx["user_return_count"],
     }
+    # if a reviewer sent this case back for more info and the customer answered,
+    # every agent needs to actually see it — otherwise "request info" re-runs the
+    # exact same pipeline on the exact same facts and nothing can change
+    if ctx.get("info_request_answer"):
+        facts["customer_clarification"] = {
+            "reviewer_asked": ctx["info_request_question"],
+            "customer_answered": ctx["info_request_answer"],
+        }
+    return facts
 
 
 # --------------------------------------------------------------- data quality

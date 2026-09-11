@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import type { ReturnRow } from "@/app/lib/api";
 import { AnswerInfoRequest } from "./AnswerInfoRequest";
+import { FileAppeal } from "./FileAppeal";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -84,6 +85,8 @@ export default async function ReturnStatusPage({
           </div>
         )}
       </div>
+
+      {r.status === "denied" && <FileAppeal returnId={id} />}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {r.photo_urls.map((u) => (

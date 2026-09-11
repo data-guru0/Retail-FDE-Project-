@@ -73,7 +73,16 @@ async def get_review_context(return_id: str) -> dict | None:
           (now() - o.placed_at) AS age_since_order,
           (SELECT count(*) FROM returns r2 WHERE r2.user_id = r.user_id)      AS user_return_count,
           (SELECT count(*) FROM orders o2 WHERE o2.user_id = r.user_id)       AS user_order_count,
-          (SELECT count(*) FROM return_photos rp WHERE rp.return_id = r.id)   AS photo_count
+          (SELECT count(*) FROM return_photos rp WHERE rp.return_id = r.id)   AS photo_count,
+          -- most recent answered clarification round-trip, if the case was ever
+          -- sent back for more info (see routers/returns.py:answer_info_request) —
+          -- without this the re-queued pipeline run never actually sees the answer
+          (SELECT i.question FROM info_requests i WHERE i.return_id = r.id
+             AND i.answered_at IS NOT NULL ORDER BY i.answered_at DESC LIMIT 1)
+                                     AS info_request_question,
+          (SELECT i.answer FROM info_requests i WHERE i.return_id = r.id
+             AND i.answered_at IS NOT NULL ORDER BY i.answered_at DESC LIMIT 1)
+                                     AS info_request_answer
         FROM returns r
         JOIN order_items oi ON oi.id = r.order_item_id
         JOIN orders o       ON o.id = r.order_id

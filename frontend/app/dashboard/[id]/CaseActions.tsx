@@ -47,20 +47,10 @@ export function CaseActions({
       ? { outline: "2px solid var(--accent)", outlineOffset: 2 }
       : {};
   return (
-    <div
-      className="card"
-      style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}
-    >
-      <strong>Actions</strong>
+    <div className="d-section d-actions">
+      <h3>Actions</h3>
       {suggest && (
-        <div
-          className="card"
-          style={{
-            padding: 8,
-            borderColor: "var(--accent)",
-            fontSize: 13,
-          }}
-        >
+        <div className="d-suggest">
           ★ Agent suggests <strong>{agentDecision}</strong> — note pre-filled
           below. Confirm it or override.
         </div>
@@ -79,7 +69,7 @@ export function CaseActions({
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="d-actions-row">
         <button
           className="btn"
           style={hint("approve")}
@@ -107,7 +97,7 @@ export function CaseActions({
       >
         Request info from customer
       </button>
-      {msg && <div style={{ color: "#ff8a8a", fontSize: 13 }}>{msg}</div>}
+      {msg && <div className="d-error">{msg}</div>}
     </div>
   );
 }

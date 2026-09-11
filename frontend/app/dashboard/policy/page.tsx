@@ -14,13 +14,15 @@ export default async function PolicyPage() {
   }).then((r) => r.json());
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700 }}>Policy editor</h1>
-      <p className="muted">
-        Saving creates a new <code>policy_docs</code> version and re-embeds it
-        into Qdrant. Later cases record which version applied (
-        <code>agent_runs.policy_version</code>).
-      </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="d-head">
+        <h1>Policy editor</h1>
+        <p>
+          Saving creates a new <code>policy_docs</code> version and re-embeds
+          it into Qdrant. Later cases record which version applied (
+          <code>agent_runs.policy_version</code>).
+        </p>
+      </div>
       <PolicyEditor docs={docs} />
     </div>
   );

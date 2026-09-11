@@ -20,7 +20,7 @@ upstream `mcp-server`.
    | decision | `get_order`, `check_policy`, `get_customer_history` |
    | planner / **image** / critic / explanation | *(none)* |
 
-3. writes the per-agent server ids to `scenarios/mcp_setup.json` + Vault
+3. writes the per-agent server ids to `infra/mcp-gateway/mcp_setup.json` + Vault
    (`secret/returnguard/mcp` → `agent_servers`).
 
 ## Auth (JWKS known-unknown)

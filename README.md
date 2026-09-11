@@ -345,8 +345,10 @@ full multi-agent pipeline, and checks the results against real Postgres / MinIO 
 Langfuse / audit-chain state. ~8–10 min.
 
 *Worked if:* the final `SMOKE SUMMARY` block is all `PASS` and the process exits
-0. Now walk the [scenario catalog](docs/SCENARIOS.md) — each file in
-`docs/scenarios/` is a guided tour of one behaviour.
+0. Now walk the [scenario catalog](docs/scenarios/README.md) — each file in
+`docs/scenarios/` is a guided, click-through tour of one behaviour, meant to be
+followed live in the running app (shop → dashboard → Langfuse/Grafana/MinIO),
+no commands required.
 
 ---
 
@@ -357,8 +359,7 @@ Langfuse / audit-chain state. ~8–10 min.
 - **Start completely over:** `make nuke` (deletes every volume), then re-run from
   Step 5.
 - **Day to day:** `make down` stops the stack keeping data · `make up` brings it
-  back · `make logs` tails everything · `make scenarios` re-runs the behaviour
-  catalog · `make smoke` re-runs all verification.
+  back · `make logs` tails everything · `make smoke` re-runs all verification.
 
 ---
 
@@ -399,15 +400,13 @@ same list. `a="…"` passes arguments to a target; `m="…"` passes a message.
 
 | Command | What it does |
 |---|---|
-| `make smoke` | Run every `scripts/verify_*.py` **and** the scenario catalog against the live system, in sequence. The full proof. ~10 min. |
-| `make scenarios` | Run just the automatable scenario catalog (`scripts/run_scenarios.py`). |
-| `make demo` | Seed, then run the audience-subset `[demo]` scenarios (A0, A2, A5). |
+| `make smoke` | Run every `scripts/verify_*.py` against the live system, in sequence. The full automated proof. ~10 min. |
 | `make opa-test` | Run the OPA policy unit tests (`infra/opa/*_test.rego`). |
 | `python scripts/verify_m1.py` … `verify_m6.py` | Individual milestone checks — stack health, shop+auth, single-agent pipe, full agent graph, reviewer workflow, docs. Run one directly instead of the whole `smoke`. |
 | `python scripts/verify_audit_chain.py` | Re-walk the hash-chained `audit_log` and fail on any tamper. |
 | `python scripts/verify_security.py` | Fire prompt-injection payloads with autonomy forced on; assert no privilege escalation, no auto-approve, a real decision row, a truthful audit entry. |
-| `python scripts/run_scenarios.py [A0 A5 …]` | Run all automatable scenarios, or only the ones you name. `--demo` = the `[demo]` subset. |
 | `python scripts/loadtest.py` (`make loadtest`) | Push ~20× normal return volume through the queue and report p95; asserts no lost jobs. |
+| [`docs/scenarios/README.md`](docs/scenarios/README.md) | The manual scenario catalog — click through the app, no commands. See "Scenario walkthroughs" below. |
 
 ### Operate / debug
 
@@ -507,37 +506,37 @@ snapshot + MinIO mirror). `bash scripts/restore.sh backups/<timestamp>` restores
 
 ---
 
-## Demo scenarios
+## Scenario walkthroughs
 
 Every scenario is real — it places orders, submits returns, and drives the
-actual multi-agent pipeline. Each one has a **step-by-step walkthrough** in
-[`docs/scenarios/`](docs/scenarios/): the situation → the exact command → what
-every agent node does → what to check in the DB / audit log / dashboard /
-Langfuse afterwards. [`docs/SCENARIOS.md`](docs/SCENARIOS.md) is the index.
+actual multi-agent pipeline. Unlike the `verify_*.py` scripts, these are
+**not automated** — each is a plain-English, click-through-the-app guide
+meant to be walked through live, by hand, in front of an audience. Start at
+[`docs/scenarios/00-watching-a-case-live.md`](docs/scenarios/00-watching-a-case-live.md)
+(how to read the Live Trace, Langfuse, MinIO, Grafana, and the four real
+alerts), then the index at
+[`docs/scenarios/README.md`](docs/scenarios/README.md) lists all 18:
 
-```bash
-python scripts/run_scenarios.py            # the automatable ones end to end (~2 min)
-python scripts/run_scenarios.py --demo     # the audience subset (A0, A2, A5)
-python scripts/run_scenarios.py A5 A7      # named scenarios only
-```
-
-| Walkthrough | Route | What it shows |
-|---|---|---|
-| [01 Matching photo](docs/scenarios/01-matching-photo-auto-approve.md) | auto-approve | a clean case clears in seconds through a real CLIP match; a QA sample still queues |
-| [02 Mismatched photo](docs/scenarios/02-mismatched-photo.md) | escalate | the photo is a claim to verify — an unverifiable one goes to a human |
-| [03 AI-faked photo](docs/scenarios/03-ai-faked-damage-photo.md) | escalate | the AI-image detector is one signal, never a lone denial |
-| [04 Serial returner](docs/scenarios/04-serial-returner.md) | escalate | the Behaviour agent scores the history, not just this transaction |
-| [05 Fraud ring](docs/scenarios/05-fraud-ring.md) | escalate | shared-fingerprint accounts linked by the `flag_ring` MCP tool |
-| [06 High value](docs/scenarios/06-high-value-within-policy.md) | escalate | big refunds always get a human, even at level `auto` |
-| [07 Outside the window](docs/scenarios/07-outside-return-window.md) | escalate (proposed deny) | auto-deny is structurally impossible |
-| [08 Incomplete request](docs/scenarios/08-incomplete-request-data-quality.md) | escalate | the data-quality gate refuses to guess |
-| [09 Prompt injection](docs/scenarios/09-prompt-injection.md) | escalate | customer text is data, not instructions; least privilege holds |
-| [10 Kill switch](docs/scenarios/10-kill-switch.md) | escalate (all) | one admin switch overrides every automation level |
-| [11 Automation ladder](docs/scenarios/11-automation-level-ladder.md) | escalate → auto-approve | the same case at `shadow` vs `assist` |
-| [12 Override + appeal](docs/scenarios/12-reviewer-override-and-appeal.md) | human decision | deny-with-confirm, disagreement logged, appeal routed away (COI) |
-
-Operational behaviours (dead-letter, Groq→OpenAI fallback, load) are in the
-`docs/SCENARIOS.md` index, run by `verify_m3_dlq.py` / `loadtest.py`.
+| # | Walkthrough | Route | What it shows |
+|---|---|---|---|
+| 01 | [Matching photo](docs/scenarios/01-matching-photo-auto-approve.md) | auto-approve | a clean case clears in seconds through a real CLIP match; a QA sample still queues |
+| 02 | [Mismatched photo](docs/scenarios/02-mismatched-photo.md) | escalate | the photo is a claim to verify — an unverifiable one goes to a human |
+| 03 | [AI-faked photo](docs/scenarios/03-ai-faked-damage-photo.md) | escalate | the AI-image detector is one signal, never a lone denial |
+| 04 | [Ambiguous / worn item](docs/scenarios/04-ambiguous-worn-item.md) | escalate (proposed deny) | wear ≠ defect is a real policy rule, not a hardcoded check |
+| 05 | [Serial returner](docs/scenarios/05-serial-returner.md) | escalate | the Behaviour agent scores the history, not just this transaction |
+| 06 | [Fraud ring](docs/scenarios/06-fraud-ring.md) | escalate | shared-fingerprint accounts linked by the `flag_ring` MCP tool |
+| 07 | [High value](docs/scenarios/07-high-value-within-policy.md) | escalate | big refunds always get a human, even at level `auto` |
+| 08 | [Outside the window](docs/scenarios/08-outside-return-window.md) | escalate (proposed deny) | auto-deny is structurally impossible, even at 96% confidence |
+| 09 | [Incomplete request](docs/scenarios/09-incomplete-request-data-quality.md) | escalate | the data-quality gate refuses to guess |
+| 10 | [Prompt injection](docs/scenarios/10-prompt-injection.md) | escalate | customer text is data, not instructions; least privilege holds |
+| 11 | [Kill switch](docs/scenarios/11-kill-switch.md) | escalate (all) | one admin switch overrides every automation level |
+| 12 | [Automation ladder](docs/scenarios/12-automation-level-ladder.md) | varies | the same case at `shadow` / `suggest` / `assist` / `auto` |
+| 13 | [Policy edit](docs/scenarios/13-policy-edit-changes-later-cases.md) | varies | an admin's edit takes effect immediately; old cases keep their old `policy_version` |
+| 14 | [Request-info round trip](docs/scenarios/14-request-info-round-trip.md) | varies | a reviewer's question re-queues the case through the real pipeline |
+| 15 | [Override + appeal](docs/scenarios/15-reviewer-override-and-appeal.md) | human decision | deny-with-confirm, a 409 on re-deciding, appeal routed away (COI), a 403 if the original reviewer tries |
+| 16 | [Dead-letter](docs/scenarios/16-pipeline-crash-dead-letter.md) | escalate | 3 real crashes → auto-escalate, never an infinite retry |
+| 17 | [Groq → OpenAI fallback](docs/scenarios/17-groq-outage-openai-fallback.md) | unaffected | a real Groq outage, a real decision still produced on OpenAI |
+| 18 | [Volume spike](docs/scenarios/18-return-volume-spike.md) | unaffected | `make loadtest` — the queue holds, p95 measured, nothing lost |
 
 ---
 
@@ -579,6 +578,14 @@ Operational behaviours (dead-letter, Groq→OpenAI fallback, load) are in the
   wasn't run (it writes the per-agent server IDs into Vault and restarts the
   worker to pick them up). Re-run `make m4-setup`, or just
   `python scripts/mcp_setup.py && docker compose restart worker`.
+- **Silent version of the above — no error at all, decisions just look thin.**
+  If you skip `make m4-setup` and go straight from `make seed` to submitting
+  returns, the pipeline doesn't crash — `_tool()` in `worker/pipeline/nodes/agents.py`
+  catches the failure per call and returns `{}`, so every node keeps running on
+  empty tool results and the Behavior agent quietly uses `behavior_risk:heuristic-fallback`
+  instead of a trained model. Nothing in the UI flags this. Check it directly:
+  `select payload->>'tool', payload->>'ok' from agent_run_events where kind='tool_call';`
+  — if every row is `ok=false`, run `make m4-setup`.
 - **`make up` says a port is already in use.** Something else on the host owns
   5432 / 3000 / 8000 / 8081 / … — stop it, or edit the `ports:` in
   `docker-compose.yml`.
@@ -595,13 +602,14 @@ Operational behaviours (dead-letter, Groq→OpenAI fallback, load) are in the
 - `make replay a="<graph_run_id> <node>"` re-runs one pipeline node in isolation;
   `make reprocess a="--since <date> --dry-run"` batch-re-reviews open returns.
 
-There is **no** pytest / Playwright / eval harness by design; verification is
-`scripts/verify_*.py` + `scripts/run_scenarios.py` driving the live system
-(`make smoke` runs all of it).
+There is **no** pytest / Playwright / eval harness by design; automated
+verification is `scripts/verify_*.py` (`make smoke` runs all of it), and the
+18 scenario walkthroughs above are the manual, human-run complement — each
+one was itself run for real against the live system while it was written.
 
 ---
 
-## What `make smoke` proves (11 checks, all green)
+## What `make smoke` proves (10 checks, all green)
 
 | Check | What it proves against the live system |
 |---|---|
@@ -610,10 +618,9 @@ There is **no** pytest / Playwright / eval harness by design; verification is
 | `verify_m3` + `_dlq` | a real Groq call via Bifrost → `agent_runs` with real tokens/cost/latency = API = DB; a real Langfuse trace; WS replay; 3 real crashes → `dead_letter` + auto-escalate, never an infinite retry |
 | `verify_m4` | the full agent graph: every node writes `agent_runs`; Policy does a real Qdrant retrieval; Behavior loads the registered model; `intake`/`policy`/`behavior` call their MCP tools **through ContextForge** (`ok=true` + `call_tool` audit rows); the Image agent's virtual server exposes **zero** tools; GovernanceGate decides **via OPA**; hash chain valid; no auto-deny |
 | `verify_audit_chain` | every `row_hash` recomputes; the chain is unbroken |
-| `run_scenarios` | A0 auto-approve (real CLIP match → `auto_approve` + QA sample), A1 shadow, A2 mismatched photo, A5 fraud ring, A6 high-value, A7 outside-window (proposed-deny → escalate), A10 prompt injection — each matches its walkthrough |
 | `verify_security` | injection via return text + text-in-image → no privilege escalation, no auto-approve; OPA denies the Image agent every tool + the `reason` model role; `slowapi` rate limiting wired; no money-mutating tool |
 | `verify_m5` | reviewer claim → deny-with-confirm → audit chain extended → override logged in `agreement_samples` → `assist` auto-approve path → request-info round trip → refund settlement (`process_refunds` → `refunded` + audit row) |
-| `verify_m6` | this README has every section + working URL; every `make` target / script exists; all 12 walkthroughs valid; the demo scenarios run green |
+| `verify_m6` | this README has every section + working URL; every `make` target / script exists; all 18 `docs/scenarios/*.md` walkthroughs have their expected sections |
 
 ## Limitations (local-only portfolio scope)
 
@@ -627,8 +634,11 @@ There is **no** pytest / Playwright / eval harness by design; verification is
   enforced in `models_config` + OPA `authz.rego` instead.
 - OTel spans from Bifrost / ContextForge → Langfuse aren't wired; Langfuse
   traces come from the SDK directly and are real.
-- The manual scenario walkthroughs (03, 04, 08, 10, 12) are runnable checklists,
-  not clicked-through-with-screenshots.
+- All 18 scenario walkthroughs are manual, click-through-the-app checklists by
+  design (no `run_scenarios.py`), not clicked-through-with-screenshots —
+  scenarios 16-18 additionally need one operator action (a fault-injection
+  toggle, a temporarily-broken key, a load-test command) since a real crash,
+  outage, or volume spike can't be produced by filling out a form correctly.
 - **The Groq + OpenAI keys were exposed in the chat that built this — rotate
   both**, then `docker compose exec vault vault kv patch
   secret/returnguard/llm openai_api_key=… groq_api_key=…` and

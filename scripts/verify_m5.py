@@ -21,7 +21,7 @@ from _kc import register_user, token
 from _rg import API, Check, httpx, q1
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FIX = ROOT / "scenarios" / "fixtures"
+FIX = ROOT / "docs" / "scenarios" / "assets"
 
 
 def customer(prefix: str) -> dict:
@@ -31,13 +31,33 @@ def customer(prefix: str) -> dict:
     return {"Authorization": f"Bearer {token(e, pw)}"}
 
 
+_staff_emails: list[str] = []
+
+
 def staff(prefix: str, role: str) -> dict:
     e = f"{prefix}-{uuid.uuid4().hex[:8]}@test.local"
     pw = "Pw1!" + uuid.uuid4().hex[:8]
     register_user(e, pw, roles=[role] if role == "reviewer" else ["admin", "reviewer"])
     h = {"Authorization": f"Bearer {token(e, pw)}"}
     httpx.get(f"{API}/dashboard/queue", headers=h, timeout=15)  # force users+reviewer row
+    _staff_emails.append(e)
     return h
+
+
+def _deactivate_staff() -> None:
+    """These synthetic reviewer/admin accounts have random, never-recorded
+    passwords — nobody can ever log in as them. Leaving them `active` in
+    `reviewers` would let real appeal routing (a random *other* reviewer,
+    `appeals.py`) hand a real appeal to one of them, permanently stuck."""
+    if not _staff_emails:
+        return
+    from _rg import db
+    with db() as c:
+        c.execute(
+            "update reviewers set active=false where user_id in "
+            "(select id from users where email = any(%(emails)s))",
+            {"emails": _staff_emails},
+        )
 
 
 def submit(h: dict, photo: str, reason: str, text: str, age_days: int = 5) -> str:
@@ -234,6 +254,7 @@ def main() -> None:
                          capture_output=True, text=True, encoding="utf-8", errors="replace")
     c.ok(sec.returncode == 0, f"verify_security passes\n{sec.stdout[-400:]}")
 
+    _deactivate_staff()
     c.done()
 
 
@@ -241,5 +262,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:  # noqa: BLE001
+        _deactivate_staff()
         print(f"verify_m5 crashed: {type(e).__name__}: {e}")
         sys.exit(2)

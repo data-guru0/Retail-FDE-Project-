@@ -24,7 +24,6 @@ import httpx
 import structlog
 
 from pipeline import opa
-from pipeline.settings import get_settings
 
 log = structlog.get_logger()
 

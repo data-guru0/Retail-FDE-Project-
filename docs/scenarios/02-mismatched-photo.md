@@ -1,61 +1,68 @@
 # Scenario 02 — Mismatched photo → escalate
 
-**Route:** escalate **· Automated by:** `python scripts/run_scenarios.py A2` **· Group:** decision behaviour **· [demo]**
+**Route:** escalate · **Group:** decision behaviour · **[demo]**
+
+See [00 — Watching a case live](00-watching-a-case-live.md) for how to read the
+Live Trace / Langfuse / MinIO panels this walkthrough refers to.
 
 ## What this shows
 
-The evidence photo is checked against the product, not trusted. When the photo is
-a different object, the Image agent catches it and the case goes to a human — the
-system never approves on a photo it can't reconcile.
+A photo is a *claim to verify*, not proof by itself. When the uploaded photo
+doesn't actually match the product, the real CLIP comparison catches it and
+the case goes to a human — even though nothing else about the request looks
+wrong.
 
 ## The situation
 
-A customer orders an item and files a return claiming "this isn't what I
-ordered", but the photo they attach is an unrelated object (a dark, generic
-image). Automation level doesn't matter here — try it at `shadow` or `auto`.
+A customer buys a **Vertex Wireless Mouse ($59.99)** and files a return for
+"not as described," but uploads a photo of something else entirely (a potted
+plant, in our real test run).
 
-## Run it
+## Walkthrough (as the customer)
 
-```bash
-python scripts/run_scenarios.py A2
-```
+1. Buy the **Vertex Wireless Mouse** and check out as in
+   [scenario 01](01-matching-photo-auto-approve.md).
+2. **My orders** → the order → **Return this**.
+3. Reason: **not as described** → note "This isn't what I ordered." → upload
+   any real photo that is clearly **not** the mouse (a photo of a plant, a
+   different object, anything unrelated) → **Submit return**.
 
-By hand: buy any product, start a return with reason **Not as described**, upload
-`scenarios/fixtures/mismatch_photo.jpg`, submit, open the case in the dashboard.
+## What happens behind the scenes
 
-## What happens, step by step
+Real numbers from a live run:
 
-| # | Node | What it does here | What you see |
-|---|---|---|---|
-| 1 | **data_quality** | photo present, product has a reference image → pass | `ok=true` |
-| 2 | **planner** | photo + reference exist → `image` stays in the plan | plan includes `image` |
-| 3 | **intake** | `get_order` via ContextForge → order details | `tool_call ok=true` |
-| 4 | **policy** | Qdrant retrieval + `check_policy` → may be within window, records `policy_version` | `rag` event |
-| 5 | **image** | CLIP similarity between upload and catalog photo ≈ **0.63** — below the 0.75 match line → **borderline/mismatch**; the borderline result is escalated to the **vision LLM**, which reports "the photo does not depict the ordered item" | `clip_similarity ≈ 0.63`, a vision-LLM sub-call in the trace |
-| 6 | **behavior** | risk model + `get_customer_history` + `flag_ring` → risk moderate | `risk_score`, `ring_accounts` |
-| 7 | **decision** | policy might be fine, but the evidence doesn't support the claim → **escalate**, with "photo does not match the ordered item" cited | `decision = escalate` |
-| 8 | **critic** | concurs — the mismatch is a real signal | `veto = false` (nothing to override; Decision already escalated) |
-| 9 | **explanation** | "We couldn't match your photo to the item on the order; a specialist will take a look." | text saved |
-| 10 | **GovernanceGate** | proposed = `escalate` → **escalate**. (Even at `auto`, only an `approve` proposal can be auto-finalised.) | `route = escalate` |
+| Agent | What it did | Real result |
+|---|---|---|
+| **policy** | checked the return-window and condition rules | `eligible: yes` — policy has no opinion on photo content |
+| **image** | compared the upload to the mouse's catalog photo, and asked a vision model to describe what it actually saw | `clip_similarity: 0.69` (mismatch); vision model: *"The photo shows a potted plant, not a mouse or its packaging"* |
+| **behavior** | scored the account | first order, 100% return rate → `abuse_likelihood: medium` |
+| **decision** | weighed the mismatch against policy eligibility | `decision: escalate`, risk 0.62 |
+| **critic** | actually *disagreed* with escalating, arguing policy eligibility should win | `veto: true, agree: false` — but a veto is a veto in either direction |
+| **GovernanceGate** | a Critic veto of any kind blocks auto-anything | **`escalate`** |
 
-## What to check afterwards
+## In the reviewer dashboard
 
-```bash
-docker compose exec -T postgres psql -U returnguard -d returnguard -c \
- "select status, decision, final_decision from returns order by created_at desc limit 1;"
-#  status=escalated | decision=escalate | final_decision=NULL
+The queue's **escalated** tab shows the case with an amber **escalate** badge
+under **Agent**. Opening it, the **Image evidence** shown in the Agent
+reasoning section is the tell: a low similarity score plus the vision model's
+plain description of what it actually saw in your photo — a human can glance
+at both images side by side and decide in seconds.
 
-docker compose exec -T postgres psql -U returnguard -d returnguard -c \
- "select agent, parsed_output->>'clip_similarity' sim
-  from agent_runs where agent='image' order by created_at desc limit 1;"
-#  image | 0.63xx
-```
+## Watch it live
 
-- **Dashboard:** the case is in the reviewer queue; the case detail shows the
-  low similarity score and the vision-LLM note as evidence.
+- **Live Trace:** the `image` node's `node_end` payload has `verdict:
+  "mismatch"` right there in the raw JSON.
+- **Langfuse:** the Image agent's vision-model call (only fired because CLIP's
+  score was borderline/low) is a real generation with the photo attached.
+- **Why the Critic's disagreement didn't flip it:** open the `governance`
+  event — its `reason` field literally starts with `"Critic vetoed: ..."`
+  followed by the Critic's own argument for the *other* side. A veto forces a
+  human regardless of which way it leans.
 
 ## Why it matters
 
-A model that approves refunds on whatever image it's handed can be farmed. Here
-the photo is a claim to be verified, and a claim the system can't verify is a
-claim a human sees.
+An image check that always trusts the upload isn't a check. Wiring in a real
+vision model — not a rule that says "a photo was attached, therefore fine" —
+is what makes this catchable at all, and routing any Critic disagreement to a
+human (instead of "resolving" it in code) is what keeps a disagreement from
+quietly becoming a wrong auto-decision in either direction.

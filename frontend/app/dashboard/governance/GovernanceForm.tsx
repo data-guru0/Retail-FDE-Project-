@@ -33,71 +33,76 @@ export function GovernanceForm({ flag }: { flag: Record<string, unknown> }) {
   }
 
   return (
-    <div
-      className="card"
-      style={{
-        padding: 14,
-        display: "flex",
-        gap: 16,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <strong style={{ minWidth: 90 }}>{String(f.scope)}</strong>
-      <label>
-        level{" "}
-        <select
-          className="select"
-          value={String(f.automation_level)}
-          onChange={(e) => setF({ ...f, automation_level: e.target.value })}
-          style={{ width: 130, display: "inline-block" }}
-        >
-          {["shadow", "suggest", "assist", "auto"].map((l) => (
-            <option key={l}>{l}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={Boolean(f.kill_switch)}
-          onChange={(e) => setF({ ...f, kill_switch: e.target.checked })}
-        />{" "}
-        kill switch
-      </label>
-      <label>
-        QA %{" "}
-        <input
-          className="input"
-          style={{ width: 60, display: "inline-block" }}
-          value={String(f.qa_sample_pct)}
-          onChange={(e) => setF({ ...f, qa_sample_pct: e.target.value })}
-        />
-      </label>
-      <label>
-        τ_risk{" "}
-        <input
-          className="input"
-          style={{ width: 60, display: "inline-block" }}
-          value={String(f.tau_risk)}
-          onChange={(e) => setF({ ...f, tau_risk: e.target.value })}
-        />
-      </label>
-      <label>
-        τ_conf{" "}
-        <input
-          className="input"
-          style={{ width: 60, display: "inline-block" }}
-          value={String(f.tau_conf)}
-          onChange={(e) => setF({ ...f, tau_conf: e.target.value })}
-        />
-      </label>
-      <button className="btn" disabled={busy} onClick={save}>
-        Save
-      </button>
-      {err && (
-        <div style={{ color: "#ff8a8a", flexBasis: "100%" }}>{err}</div>
-      )}
+    <div className="d-section">
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="d-badge info">
+          <span className="dot" />
+          {String(f.scope)}
+        </span>
+        {Boolean(f.kill_switch) && (
+          <span className="d-badge danger">
+            <span className="dot" />
+            kill switch active
+          </span>
+        )}
+      </div>
+      <div className="d-gov-grid">
+        <div className="d-field">
+          <label>Automation level</label>
+          <select
+            className="select"
+            value={String(f.automation_level)}
+            onChange={(e) => setF({ ...f, automation_level: e.target.value })}
+            style={{ width: 140 }}
+          >
+            {["shadow", "suggest", "assist", "auto"].map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+        <div className="d-field">
+          <label>Kill switch</label>
+          <div className="d-switch-row" style={{ height: 34 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(f.kill_switch)}
+              onChange={(e) => setF({ ...f, kill_switch: e.target.checked })}
+            />
+            force human review
+          </div>
+        </div>
+        <div className="d-field">
+          <label>QA sample %</label>
+          <input
+            className="input"
+            style={{ width: 70 }}
+            value={String(f.qa_sample_pct)}
+            onChange={(e) => setF({ ...f, qa_sample_pct: e.target.value })}
+          />
+        </div>
+        <div className="d-field">
+          <label>τ_risk</label>
+          <input
+            className="input"
+            style={{ width: 70 }}
+            value={String(f.tau_risk)}
+            onChange={(e) => setF({ ...f, tau_risk: e.target.value })}
+          />
+        </div>
+        <div className="d-field">
+          <label>τ_conf</label>
+          <input
+            className="input"
+            style={{ width: 70 }}
+            value={String(f.tau_conf)}
+            onChange={(e) => setF({ ...f, tau_conf: e.target.value })}
+          />
+        </div>
+        <button className="btn" disabled={busy} onClick={save}>
+          Save
+        </button>
+      </div>
+      {err && <div className="d-error">{err}</div>}
     </div>
   );
 }

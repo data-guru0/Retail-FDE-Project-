@@ -102,9 +102,8 @@ def main() -> None:
     c.ok(audit_act == "escalate", f"audit_log records the real outcome (action={audit_act})")
 
     # least privilege still holds
-    setup = ROOT / "scenarios" / "mcp_setup.json"
+    setup = ROOT / "infra" / "mcp-gateway" / "mcp_setup.json"
     if setup.exists():
-        import json
         cfg = json.loads(setup.read_text())
         tok = subprocess.run(
             ["docker", "compose", "exec", "-T", "mcp-gateway", "python", "-m",

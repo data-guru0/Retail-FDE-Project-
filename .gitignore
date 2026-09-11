@@ -80,22 +80,20 @@ scripts/_dlq_worker*.log
 # written by verify_m3_dlq.py while it runs:
 docker-compose.dlqtest.yml
 # written by scripts/mcp_setup.py (ContextForge virtual-server ids for reference):
-scenarios/mcp_setup.json
+infra/mcp-gateway/mcp_setup.json
 # local review artifact from seed/fetch_images.py (the product images themselves ARE committed):
 seed/images/_contact_sheet.png
 
 # ---- Docker nested-bind-mount mountpoints ---------------------------------
-# docker-compose.override.yml mounts ./docs, ./seed, ./ml, ./scenarios INSIDE
-# ./backend and ./worker (which are themselves mounted at /app). Docker creates
-# these empty dirs on the host on every `docker compose up`. They are not source.
+# docker-compose.override.yml mounts ./docs, ./seed, ./ml INSIDE ./backend and
+# ./worker (which are themselves mounted at /app). Docker creates these empty
+# dirs on the host on every `docker compose up`. They are not source.
 backend/docs/
 backend/seed/
 backend/ml/
-backend/scenarios/
 worker/docs/
 worker/seed/
 worker/ml/
-worker/scenarios/
 
 # ---- OS / editor ---------------------------------------------------------
 .DS_Store
