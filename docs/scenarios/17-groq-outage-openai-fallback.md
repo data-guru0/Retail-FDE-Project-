@@ -17,11 +17,30 @@ or rejects the key, the case still gets decided — on a different, real model
 Like [scenario 16](16-pipeline-crash-dead-letter.md), you can't make a real
 provider outage happen from the shop UI — you have to actually take Groq
 away, the way a real incident would. **Never do this against a production
-key** — the safe rehearsal is to temporarily point `GROQ_API_KEY` in `.env` at
-an obviously invalid value, restart only the Bifrost gateway (it reads
-provider keys straight from `.env` at container start — the backend and
-worker never need to be touched, since they always call the fixed Bifrost
-URL), run one case, then put the real key back and restart Bifrost again.
+key.** Bifrost reads `GROQ_API_KEY` straight from `.env` at container start —
+the backend and worker never need to be touched, since they always call the
+fixed Bifrost URL regardless of which provider actually answers.
+
+1. Back up `.env` first (so you can restore the exact original byte-for-byte,
+   not just retype the key from memory):
+   ```bash
+   cp .env .env.bak
+   ```
+2. Edit `.env` and change the `GROQ_API_KEY` line to an obviously invalid
+   value, e.g. `GROQ_API_KEY=invalid_for_this_demo`.
+3. Recreate only the Bifrost container so it picks up the broken key — this
+   restarts just the LLM gateway, nothing else:
+   ```bash
+   docker compose up -d --force-recreate bifrost
+   ```
+4. As a customer, submit any return normally. Watch what model each agent
+   actually used in the reviewer dashboard's **Agent reasoning** section (see
+   the table below).
+5. Restore the real key and bring Bifrost back:
+   ```bash
+   cp .env.bak .env
+   docker compose up -d --force-recreate bifrost
+   ```
 
 ## What happens behind the scenes
 

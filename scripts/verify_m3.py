@@ -105,9 +105,18 @@ def main() -> None:
     c.ok(api_ret["status"] in ("in_review", "escalated", "approved"),
          f"shadow: agent decided, human still acts (status={api_ret['status']})")
 
-    # events streamed
-    evs = qall("select kind from agent_run_events where return_id=%(r)s order by seq", r=rid)
-    kinds = [e[0] for e in evs]
+    # events streamed — `returns.status` finalizes slightly before the trailing
+    # `pipeline_end` event row commits, so poll briefly instead of assuming it's
+    # already there the instant status goes terminal (this raced and failed
+    # exactly once, on the very first, abnormally slow post-nuke pipeline run).
+    kinds: list[str] = []
+    ev_deadline = time.time() + 15
+    while time.time() < ev_deadline:
+        evs = qall("select kind from agent_run_events where return_id=%(r)s order by seq", r=rid)
+        kinds = [e[0] for e in evs]
+        if "pipeline_start" in kinds and "pipeline_end" in kinds:
+            break
+        time.sleep(1)
     c.ok("pipeline_start" in kinds and "pipeline_end" in kinds,
          f"trace events streamed: {kinds}")
     c.ok("node_end" in kinds, "decision node_end event present")

@@ -16,7 +16,11 @@ services:
       - ./docs:/app/docs
       - vault_creds:/vault-creds:ro
       - hf_cache:/root/.cache/huggingface   # CLIP/detector weights persist across recreate
-    ports: ["9100:9100"]
+    # no host port for :9100 — Prometheus scrapes it over the internal network
+    # (worker:9100, see infra/prometheus/prometheus.yml), and a fixed host port
+    # blocks `docker compose up -d --scale worker=N` outright (every replica
+    # would fight over the same host port). Use `docker compose exec worker
+    # curl localhost:9100/metrics` for direct access, or Grafana/Prometheus.
 
   mcp-server:
     volumes:

@@ -27,17 +27,31 @@ genuinely exercised, then you turn it back off.
 
 ## Walkthrough (as an operator, then as a customer)
 
-1. In a terminal, at the repo root, temporarily add the fault-injection
-   variable to the worker and recreate it:
+1. In a terminal, at the repo root, create a tiny override file that adds the
+   fault-injection variable to the worker's environment — `docker compose up`
+   doesn't take an inline `-e VAR=value` flag the way `exec`/`run` do, so this
+   is the actual way to set one:
+   ```bash
+   cat > docker-compose.faulttest.yml << 'EOF'
+   services:
+     worker:
+       environment:
+         RG_PIPELINE_FORCE_ERROR: "1"
+   EOF
    ```
+2. Recreate just the worker with that file layered on top — this restarts
+   only the worker container, with the fault switch now on:
+   ```bash
    docker compose -f docker-compose.yml -f docker-compose.override.yml \
-     -e RG_PIPELINE_FORCE_ERROR=1 up -d --force-recreate worker
+     -f docker-compose.faulttest.yml up -d --force-recreate worker
    ```
-   (or add it to a small override file the same way `verify_m3_dlq.py` does —
-   either way, this is a real container restart, not a hidden flag).
-2. As a customer, submit any return normally.
-3. Watch it fail. Then restore the worker:
-   ```
+3. As a customer, submit any return normally.
+4. Watch it fail 3× (see the table below), then delete the override file and
+   recreate the worker again — with no `-f docker-compose.faulttest.yml` on
+   the command, Compose rebuilds the worker's environment from just the base
+   files, so the fault switch is gone:
+   ```bash
+   rm docker-compose.faulttest.yml
    docker compose up -d --force-recreate worker
    ```
 

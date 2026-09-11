@@ -456,22 +456,41 @@ backlog is *pipeline* throughput rather than *human* throughput, add workers:
 cooperate, and the atomic claim in `review_return` prevents double-processing.
 
 **Dead-letter.** A `dead_letter` row means a case crashed 3× — it was
-auto-escalated (a human will see it) but the root cause needs a look. Inspect
-`select * from dead_letter order by created_at desc;` and the matching
-`agent_run_events` (kind `error`). Re-run one case: `make replay a="<graph_run_id>
-<node>"` to debug a node, or `update returns set status='pending',
-review_attempts=0 where id='…';` (the `dispatch_outbox` cron re-enqueues it).
+auto-escalated (a human will see it) but the root cause needs a look. Inspect it
+by opening a `psql` shell inside the Postgres container and running a query —
+the command below does both in one line, `-c` just means "run this SQL and
+exit":
+```bash
+docker compose exec -T postgres psql -U returnguard -d returnguard -c \
+  "select * from dead_letter order by created_at desc;"
+```
+Also check the matching `agent_run_events` (kind `error`) the same way. Re-run
+one case: `make replay a="<graph_run_id> <node>"` to debug a single node, or
+re-queue the whole case the same `psql` way — this `update` puts it back in
+`pending` with a reset attempt counter, and the `dispatch_outbox` cron
+re-enqueues it within a few seconds:
+```bash
+docker compose exec -T postgres psql -U returnguard -d returnguard -c \
+  "update returns set status='pending', review_attempts=0 where id='<return-id>';"
+```
 
 **Policy change.** Dashboard → Policy → edit → Save writes a new `policy_docs`
 version and enqueues a Qdrant re-embed. New cases pick it up automatically;
 `agent_runs.policy_version` records which applied. Re-review still-pending cases
 under the old policy: `make reprocess a="--since <date> --policy-version <new>"`.
 
-**Key rotation.** `docker compose exec vault vault kv patch
-secret/returnguard/llm openai_api_key=sk-…` (or `groq_api_key=…`), then
-`docker compose restart backend worker` (settings are cached per process). For
-generated DB / MinIO / Keycloak creds, edit `.env` and `make nuke` is the clean
-path.
+**Key rotation.** Patch the secret inside Vault, then restart the two services
+that actually read it — Vault needs its dev-mode root token passed explicitly
+via `-e VAULT_TOKEN=root` (from your `.env`'s `VAULT_DEV_ROOT_TOKEN_ID`) or it
+403s:
+```bash
+docker compose exec -T -e VAULT_TOKEN=root vault vault kv patch \
+  secret/returnguard/llm openai_api_key=sk-...
+# (or groq_api_key=... on the same line instead)
+docker compose restart backend worker   # settings are cached per process
+```
+For generated DB / MinIO / Keycloak creds, edit `.env` and `make nuke` is the
+clean path.
 
 **Backup / restore.** `make backup` → `backups/<timestamp>/` (pg_dump + Qdrant
 snapshot + MinIO mirror). `bash scripts/restore.sh backups/<timestamp>` restores.
