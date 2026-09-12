@@ -316,7 +316,6 @@ services:
       - hf_cache:/root/.cache/huggingface   # keep CLIP/detector weights across recreate
       - ./ml:/app/ml
       - ./docs:/app/docs
-      - ./scenarios:/app/scenarios:ro
     networks: [rg]
     entrypoint: ["/bin/sh", "-c", ". /vault-creds/worker.env 2>/dev/null; exec \"$0\" \"$@\""]
     command: ["arq", "pipeline.worker.WorkerSettings"]
@@ -353,7 +352,7 @@ services:
       RG_KEYCLOAK: http://keycloak:8080
     volumes:
       - ./scripts:/app/scripts:ro
-      - ./scenarios:/app/scenarios:ro
+      - ./docs:/app/docs:ro
     entrypoint: ["python", "/app/scripts/loadtest.py"]
     command: ["--factor", "20", "--concurrency", "5"]
     depends_on:

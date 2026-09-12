@@ -559,58 +559,6 @@ alerts), then the index at
 
 ---
 
-## Troubleshooting (things that actually went wrong building this)
-
-- **Postgres 18 won't start, "unused mount/volume".** pg18 changed the data-dir
-  convention — the volume mounts at `/var/lib/postgresql`, not `/…/data`. Already
-  fixed in `docker-compose.yml`; if you have an old volume, `make nuke`.
-- **`arq` dependency conflict.** `arq` requires `redis<6`; the worker and backend
-  pin `redis==5.3.1`.
-- **Keycloak tokens have no `sub` claim.** Keycloak 26 only includes `sub` when
-  the `basic` client scope is assigned — it's in the realm export.
-- **MinIO presigned URL returns XML / SignatureDoesNotMatch.** The presign must be
-  computed against the browser-reachable host (`localhost:9000`), not the docker
-  hostname, or the SigV4 signature won't match. `app/services/storage.py` uses a
-  separate client for presigning.
-- **Bifrost: "provider groq not found".** Bifrost v2 reads `config.json` from
-  `/app/data/`, not a `BIFROST_CONFIG_PATH`. And Groq's 2026 catalog dropped the
-  `llama-3.x` ids — the model roles now map to `openai/gpt-oss-*` (see
-  `worker/pipeline/models_config.py`).
-- **ContextForge "Unable to connect to gateway" (502).** The MCP SDK v2 streamable
-  server rejects unknown `Host` headers; `mcp-server/server.py` passes
-  `TransportSecuritySettings(allowed_hosts=[...])`.
-- **Worker: "at least one function must be registered" even though there is one.**
-  `pip install .` had baked a stale copy of the package into site-packages that
-  shadowed the bind-mounted source — the Dockerfiles use `pip install -e .`.
-- **First pipeline run is slow (2–4 min).** CLIP *and* the AI-image detector
-  (~1.5 GB) download on the first return that reaches the Image agent. They land
-  in the `hf_cache` Docker volume, so this happens **once** — it survives
-  `docker compose restart` / `--force-recreate`, and only `make nuke` clears it.
-  `verify_m3` / `verify_m4` in the first `make smoke` after `make nuke` absorb
-  it; every run after is fast.
-- **`worker` container shows `Exited (1)` right after `make up`.** Expected on a
-  fresh stack — `make up` starts the worker before `make migrate`, so its
-  startup query hits a table that doesn't exist yet. It's set to
-  `restart: unless-stopped` and recovers on its own once `make migrate` runs;
-  the crash log during that window is harmless.
-- **Agents' tool calls fail with "no ContextForge virtual server".** `make m4-setup`
-  wasn't run (it writes the per-agent server IDs into Vault and restarts the
-  worker to pick them up). Re-run `make m4-setup`, or just
-  `python scripts/mcp_setup.py && docker compose restart worker`.
-- **Silent version of the above — no error at all, decisions just look thin.**
-  If you skip `make m4-setup` and go straight from `make seed` to submitting
-  returns, the pipeline doesn't crash — `_tool()` in `worker/pipeline/nodes/agents.py`
-  catches the failure per call and returns `{}`, so every node keeps running on
-  empty tool results and the Behavior agent quietly uses `behavior_risk:heuristic-fallback`
-  instead of a trained model. Nothing in the UI flags this. Check it directly:
-  `select payload->>'tool', payload->>'ok' from agent_run_events where kind='tool_call';`
-  — if every row is `ok=false`, run `make m4-setup`.
-- **`make up` says a port is already in use.** Something else on the host owns
-  5432 / 3000 / 8000 / 8081 / … — stop it, or edit the `ports:` in
-  `docker-compose.yml`.
-
----
-
 ## Contributing
 
 - After editing an agent prompt: bump its `version:` header, then
@@ -640,25 +588,3 @@ one was itself run for real against the live system while it was written.
 | `verify_security` | injection via return text + text-in-image → no privilege escalation, no auto-approve; OPA denies the Image agent every tool + the `reason` model role; `slowapi` rate limiting wired; no money-mutating tool |
 | `verify_m5` | reviewer claim → deny-with-confirm → audit chain extended → override logged in `agreement_samples` → `assist` auto-approve path → request-info round trip → refund settlement (`process_refunds` → `refunded` + audit row) |
 | `verify_m6` | this README has every section + working URL; every `make` target / script exists; all 18 `docs/scenarios/*.md` walkthroughs have their expected sections |
-
-## Limitations (local-only portfolio scope)
-
-- Dev-mode Vault + Keycloak, plain HTTP on localhost, no TLS — not a production
-  posture.
-- `infra/keycloak/realm-export.json` carries the local Keycloak **client**
-  secrets in plaintext (committed) — local-dev clients only. `frontend/.env.local`
-  (git-ignored) holds the Auth.js + web-client secret.
-- Bifrost virtual keys scope models but aren't on the inference hot path (an OSS
-  v2.0.0 credential-binding limitation) — per-agent model least-privilege is
-  enforced in `models_config` + OPA `authz.rego` instead.
-- OTel spans from Bifrost / ContextForge → Langfuse aren't wired; Langfuse
-  traces come from the SDK directly and are real.
-- All 18 scenario walkthroughs are manual, click-through-the-app checklists by
-  design (no `run_scenarios.py`), not clicked-through-with-screenshots —
-  scenarios 16-18 additionally need one operator action (a fault-injection
-  toggle, a temporarily-broken key, a load-test command) since a real crash,
-  outage, or volume spike can't be produced by filling out a form correctly.
-- **The Groq + OpenAI keys were exposed in the chat that built this — rotate
-  both**, then `docker compose exec vault vault kv patch
-  secret/returnguard/llm openai_api_key=… groq_api_key=…` and
-  `docker compose restart backend worker`.
