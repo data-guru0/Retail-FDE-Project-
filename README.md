@@ -282,11 +282,9 @@ is in use, stop whatever owns it (common: a local Postgres on 5432) and re-run.
 make migrate
 ```
 
-Runs the Alembic migrations inside the backend container (this project never uses
-`create_all` — every table is a real, ordered migration).
+Runs the Alembic migrations inside the backend container
 
-*Worked if:* the last line is an Alembic `Running upgrade … -> …, <name>` ending
-at the current head with no traceback.
+**make migrate builds the actual tables inside the database.**
 
 ### Step 7 — load the seed data
 
@@ -297,8 +295,18 @@ make seed
 Inserts 29 real products (with images pushed to MinIO) and the versioned
 return-policy documents the Policy agent will search.
 
-*Worked if:* it prints a count of products + policy docs written and exits 0.
-Check: open http://localhost:3000 — the shop shows a product grid.
+-  make seed fills the empty database with real starting data.
+
+- After make migrate, you have all the tables built — but they're empty, like drawers with labels but nothing inside. make seed puts the actual first batch of real content into them.
+
+### What it does:
+
+**29 real products (real names, prices, descriptions, categories) — so the shop actually has something to browse instead of a blank page**
+
+**Each product's real photo, uploaded into storage (MinIO)**
+
+**The return policy documents — the actual written rules (30-day window, high-value threshold, etc.) that the AI agents will read later to decide if a return is allowed**
+
 
 ### Step 8 — one-time AI setup
 
@@ -306,16 +314,14 @@ Check: open http://localhost:3000 — the shop shows a product grid.
 make m4-setup
 ```
 
-Runs six things in order, then restarts the worker to pick them all up:
-generate the synthetic fraud dataset → train + register the scikit-learn risk
-model → embed the policy docs into Qdrant → create one **ContextForge virtual
-server per agent** (tool allow-list) → create one **Bifrost virtual key per
-agent** (model allow-list + budget) → push the agent prompts to **Langfuse**
-(versioned, UI-editable). ~2–3 min.
+**make m4-setup is what actually turns the AI parts on. It does 6 things back to back:**
 
-*Worked if:* it ends with `setup complete (dataset + model + policy index +
-ContextForge + Bifrost VKs + prompts)`, with `pushed -> lf v1` for each of the
-7 agent prompts just above it.
+1. Generates a big batch of realistic fake order/return history (for training).
+2. Trains the actual fraud-risk model on that history.
+3. Loads the return-policy text into the AI's searchable memory (so it can look up rules).
+4. Tells the security gateway which tools each AI agent is allowed to use.
+5. Tells the AI gateway which models each agent is allowed to call.
+6. Pushes the agents' instructions (prompts) to the tracing dashboar
 
 ### Step 9 — start the shop + dashboard
 
